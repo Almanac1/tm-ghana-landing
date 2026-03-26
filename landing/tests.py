@@ -83,3 +83,27 @@ class ReservationEmailFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, f"{reverse('home')}#booking")
         self.assertEqual(Submission.objects.count(), 1)
+
+    def test_online_reservation_email_uses_online_date_labels(self):
+        lead_payload = {
+            "form_type": "lead",
+            "lead-name": "Linus Torvalds",
+            "lead-email": "linus@example.com",
+            "lead-country": "GH",
+            "lead-phone": "2335550104",
+        }
+        self.client.post(reverse("home"), data=lead_payload)
+
+        reservation_payload = {
+            "form_type": "reservation",
+            "reservation-session_type": Reservation.SessionType.ONLINE,
+            "reservation-session_date": Reservation.SessionDate.NOV19,
+            "measured_height": "480",
+        }
+        response = self.client.post(reverse("home"), data=reservation_payload)
+        self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(len(mail.outbox), 2)
+        visitor_email = mail.outbox[1]
+        self.assertIn("Selected session: Online Session", visitor_email.body)
+        self.assertIn("Selected date: Saturday, November 22", visitor_email.body)

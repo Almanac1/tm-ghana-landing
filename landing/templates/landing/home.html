@@ -221,13 +221,13 @@
               </div>
 
               <!-- Date Options -->
-              <div class="date-options{% if not lead_details_completed %} is-locked{% endif %}" id="reservationDateOptions"{% if not lead_details_completed %} aria-disabled="true"{% endif %}>
-                {% for choice in reservation_form.session_date %}
-                  <label class="radio-option{% if not lead_details_completed %} is-disabled{% endif %}">
-                    {{ choice.tag }}
-                    <span>{{ choice.choice_label }}</span>
-                  </label>
-                {% endfor %}
+              <div
+                class="date-options{% if not lead_details_completed %} is-locked{% endif %}"
+                id="reservationDateOptions"
+                data-date-field-name="{{ reservation_form.session_date.html_name }}"
+                data-selected-date="{{ reservation_form.session_date.value|default_if_none:'' }}"
+                data-session-mode="{{ reservation_form.session_type.value|default:'physical' }}"
+                {% if not lead_details_completed %}aria-disabled="true"{% endif %}>
               </div>
             </div>
 

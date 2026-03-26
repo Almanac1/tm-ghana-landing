@@ -179,6 +179,20 @@ const reservationSessionControl = document.getElementById('reservationSessionCon
 const reservationDateOptions = document.getElementById('reservationDateOptions');
 const reservationSubmitBtn = document.getElementById('reservationSubmitBtn');
 const reservationUnlockNote = document.getElementById('reservationUnlockNote');
+const reservationDateOptionsByMode = {
+  physical: [
+    { value: 'nov5', label: 'Wednesday, November 5' },
+    { value: 'nov12', label: 'Wednesday, November 12' },
+    { value: 'nov19', label: 'Wednesday, November 19' },
+    { value: 'nov25', label: 'Wednesday, November 25' }
+  ],
+  online: [
+    { value: 'nov5', label: 'Saturday, November 5' },
+    { value: 'nov12', label: 'Saturday, November 15' },
+    { value: 'nov19', label: 'Saturday, November 22' },
+    { value: 'nov25', label: 'Saturday, November 29' }
+  ]
+};
 const reservationInteractiveControls = reservationFormCard
   ? Array.from(
       reservationFormCard.querySelectorAll(
@@ -209,6 +223,12 @@ const setReservationLockedState = (isLocked) => {
   if (reservationDateOptions) {
     reservationDateOptions.classList.toggle('is-locked', isLocked);
     reservationDateOptions.setAttribute('aria-disabled', String(isLocked));
+    reservationDateOptions.querySelectorAll('.radio-option').forEach(option => {
+      option.classList.toggle('is-disabled', isLocked);
+    });
+    reservationDateOptions.querySelectorAll('input[type="radio"]').forEach(input => {
+      input.disabled = isLocked;
+    });
   }
 
   reservationInteractiveControls.forEach(control => {
@@ -234,7 +254,45 @@ const syncReservationPills = () => {
   });
 };
 
-const applyReservationSessionMode = (value) => {
+const renderReservationDateOptions = (sessionMode, clearSelection = false) => {
+  if (reservationDateOptions) {
+    const normalizedMode = sessionMode === 'online' ? 'online' : 'physical';
+    const options = reservationDateOptionsByMode[normalizedMode] || reservationDateOptionsByMode.physical;
+    const fieldName = reservationDateOptions.dataset.dateFieldName || 'reservation-session_date';
+    const isLocked = reservationLockShell?.disabled ?? false;
+    const selectedDate = clearSelection ? '' : (reservationDateOptions.dataset.selectedDate || '');
+    reservationDateOptions.dataset.sessionMode = normalizedMode;
+
+    reservationDateOptions.innerHTML = '';
+    options.forEach((option, index) => {
+      const optionId = `reservation-session-date-${normalizedMode}-${index}`;
+
+      const label = document.createElement('label');
+      label.className = `radio-option${isLocked ? ' is-disabled' : ''}`;
+
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = fieldName;
+      input.value = option.value;
+      input.id = optionId;
+      input.checked = selectedDate === option.value;
+      input.disabled = isLocked;
+
+      const text = document.createElement('span');
+      text.textContent = option.label;
+
+      label.appendChild(input);
+      label.appendChild(text);
+      reservationDateOptions.appendChild(label);
+    });
+
+    if (clearSelection) {
+      reservationDateOptions.dataset.selectedDate = '';
+    }
+  }
+};
+
+const applyReservationSessionMode = (value, clearSelection = false) => {
   if (!reservationToggleInputs.length || !value) return;
   const matchedInput = Array.from(reservationToggleInputs).find(input => input.value === value);
   if (!matchedInput) return;
@@ -242,15 +300,21 @@ const applyReservationSessionMode = (value) => {
   if (reservationSessionType) {
     reservationSessionType.value = value;
   }
+  renderReservationDateOptions(value, clearSelection);
   syncReservationPills();
 };
 
+if (reservationDateOptions) {
+  reservationDateOptions.addEventListener('change', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.type !== 'radio') return;
+    reservationDateOptions.dataset.selectedDate = target.value;
+  });
+}
+
 reservationToggleInputs.forEach(input => {
   input.addEventListener('change', () => {
-    syncReservationPills();
-    if (reservationSessionType) {
-      reservationSessionType.value = input.value;
-    }
+    applyReservationSessionMode(input.value, true);
   });
 });
 
@@ -268,7 +332,10 @@ if (reservationSessionType && !reservationSessionType.value) {
 }
 
 if (reservationSessionType && reservationToggleInputs.length) {
-  applyReservationSessionMode(reservationSessionType.value);
+  const activeMode = reservationDateOptions?.dataset.sessionMode || reservationSessionType.value;
+  applyReservationSessionMode(activeMode, false);
+} else if (reservationDateOptions) {
+  renderReservationDateOptions('physical', false);
 }
 
 if (reservationFormCard && reservationLockShell) {

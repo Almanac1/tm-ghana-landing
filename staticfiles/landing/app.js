@@ -179,6 +179,20 @@ const reservationSessionControl = document.getElementById('reservationSessionCon
 const reservationDateOptions = document.getElementById('reservationDateOptions');
 const reservationSubmitBtn = document.getElementById('reservationSubmitBtn');
 const reservationUnlockNote = document.getElementById('reservationUnlockNote');
+const reservationDateLabelMap = {
+  physical: {
+    nov5: 'Wednesday, November 5',
+    nov12: 'Wednesday, November 12',
+    nov19: 'Wednesday, November 19',
+    nov25: 'Wednesday, November 25'
+  },
+  online: {
+    nov5: 'Saturday, November 5',
+    nov12: 'Saturday, November 15',
+    nov19: 'Saturday, November 22',
+    nov25: 'Saturday, November 29'
+  }
+};
 const reservationInteractiveControls = reservationFormCard
   ? Array.from(
       reservationFormCard.querySelectorAll(
@@ -241,6 +255,15 @@ const applyReservationSessionMode = (value) => {
   matchedInput.checked = true;
   if (reservationSessionType) {
     reservationSessionType.value = value;
+  }
+  if (reservationDateOptions) {
+    const labelsByDate = reservationDateLabelMap[value] || reservationDateLabelMap.physical;
+    reservationDateOptions.querySelectorAll('.radio-option').forEach(option => {
+      const input = option.querySelector('input[type="radio"]');
+      const label = option.querySelector('span');
+      if (!input || !label) return;
+      label.textContent = labelsByDate[input.value] || label.textContent;
+    });
   }
   syncReservationPills();
 };

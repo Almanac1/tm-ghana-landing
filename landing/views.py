@@ -48,6 +48,22 @@ LEAD_DETAILS_SESSION_KEY = "landing_lead_details_completed"
 logger = logging.getLogger(__name__)
 
 
+SESSION_DATE_LABELS = {
+    Reservation.SessionType.PHYSICAL: {
+        Reservation.SessionDate.NOV5: "Wednesday, November 5",
+        Reservation.SessionDate.NOV12: "Wednesday, November 12",
+        Reservation.SessionDate.NOV19: "Wednesday, November 19",
+        Reservation.SessionDate.NOV25: "Wednesday, November 25",
+    },
+    Reservation.SessionType.ONLINE: {
+        Reservation.SessionDate.NOV5: "Saturday, November 5",
+        Reservation.SessionDate.NOV12: "Saturday, November 15",
+        Reservation.SessionDate.NOV19: "Saturday, November 22",
+        Reservation.SessionDate.NOV25: "Saturday, November 29",
+    },
+}
+
+
 def _extract_first_name(full_name: str) -> str:
     parts = full_name.strip().split()
     return parts[0] if parts else "there"
@@ -83,7 +99,9 @@ def _send_submission_emails(submission: Submission) -> None:
     admin_to = [settings.LANDING_ADMIN_EMAIL]
     first_name = _extract_first_name(submission.name)
     session_type = submission.get_session_type_display() if submission.session_type else "Not provided"
-    session_date = submission.get_session_date_display()
+    session_date = SESSION_DATE_LABELS.get(submission.session_type, {}).get(
+        submission.session_date, submission.get_session_date_display()
+    )
 
     admin_subject = f"New TM landing submission from {submission.name}"
     admin_body = render_to_string(
