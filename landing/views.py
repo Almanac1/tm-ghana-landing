@@ -4,6 +4,7 @@ from typing import Optional
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
@@ -80,26 +81,30 @@ def _first_form_error(form) -> Optional[str]:
 def _send_submission_emails(submission: Submission) -> None:
     from_email = settings.DEFAULT_FROM_EMAIL
     admin_to = [settings.LANDING_ADMIN_EMAIL]
+    first_name = _extract_first_name(submission.name)
+    session_type = submission.get_session_type_display() if submission.session_type else "Not provided"
+    session_date = submission.get_session_date_display()
 
     admin_subject = f"New TM landing submission from {submission.name}"
-    admin_body = (
-        "A new landing page submission was received.\n\n"
-        f"Name: {submission.name}\n"
-        f"Email: {submission.email}\n"
-        f"Phone: {submission.phone}\n"
-        f"Session mode: {submission.get_session_type_display() if submission.session_type else 'Not provided'}\n"
-        f"Reservation date: {submission.get_session_date_display()}\n"
-        f"Message: {submission.message or 'None'}\n"
-        f"Submitted at: {submission.created_at.isoformat()}\n"
+    admin_body = render_to_string(
+        "landing/emails/admin_submission_notification.txt",
+        {
+            "submission": submission,
+            "first_name": first_name,
+            "session_type": session_type,
+            "session_date": session_date,
+        },
     )
 
-    visitor_subject = "Your Transcendental Meditation reservation request"
-    visitor_body = (
-        f"Hi {submission.name.split()[0] if submission.name else 'there'},\n\n"
-        "Thank you for submitting your reservation request.\n"
-        "We have received your details and our team will follow up with the next steps shortly.\n\n"
-        "Warm regards,\n"
-        "Transcendental Meditation Team"
+    visitor_subject = "We received your meditation reservation"
+    visitor_body = render_to_string(
+        "landing/emails/visitor_reservation_confirmation.txt",
+        {
+            "submission": submission,
+            "first_name": first_name,
+            "session_type": session_type,
+            "session_date": session_date,
+        },
     )
 
     EmailMultiAlternatives(

@@ -1,0 +1,11 @@
+Hi {{ first_name }},
+
+Thank you for reserving your place with us. We have received your registration.
+
+Selected session: {{ session_type }}
+Selected date: {{ session_date }}
+
+We are looking forward to meditating with you and will follow up with the next steps shortly.
+
+Warm regards,
+Transcendental Meditation Team

@@ -1,0 +1,10 @@
+A new landing page submission was received.
+
+Full name: {{ submission.name }}
+First name: {{ first_name }}
+Email: {{ submission.email }}
+Phone: {{ submission.phone }}
+Session mode: {{ session_type }}
+Reservation date: {{ session_date }}
+Message: {% if submission.message %}{{ submission.message }}{% else %}None{% endif %}
+Submitted at: {{ submission.created_at|date:"c" }}

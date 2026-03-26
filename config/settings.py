@@ -26,7 +26,8 @@ SECRET_KEY = 'django-insecure-*l%zm_&i64ee9a*$s_tqz22#sv(#vquc1=dd&_ijlk-zwa97*p
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['OjemeOjikutu.pythonanywhere.com']
+ALLOWED_HOSTS = ['OjemeOjikutu.pythonanywhere.com',
+                 '127.0.0.1']
 
 
 # Application definition
@@ -129,13 +130,19 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Email configuration (env-driven for production/PythonAnywhere compatibility)
-EMAIL_BACKEND = os.getenv("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
-EMAIL_HOST = os.getenv("DJANGO_EMAIL_HOST", "")
-EMAIL_PORT = int(os.getenv("DJANGO_EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("DJANGO_EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("DJANGO_EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.getenv("DJANGO_EMAIL_USE_TLS", "true").lower() in {"1", "true", "yes", "on"}
-EMAIL_USE_SSL = os.getenv("DJANGO_EMAIL_USE_SSL", "false").lower() in {"1", "true", "yes", "on"}
-DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@example.com")
+# Email configuration (env-driven)
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    os.getenv("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"),
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", os.getenv("DJANGO_EMAIL_HOST", ""))
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", os.getenv("DJANGO_EMAIL_PORT", "587")))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", os.getenv("DJANGO_EMAIL_HOST_USER", ""))
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", os.getenv("DJANGO_EMAIL_HOST_PASSWORD", ""))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", os.getenv("DJANGO_EMAIL_USE_TLS", "true")).lower() in {"1", "true", "yes", "on"}
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", os.getenv("DJANGO_EMAIL_USE_SSL", "false")).lower() in {"1", "true", "yes", "on"}
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    os.getenv("DJANGO_DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@example.com"),
+)
 LANDING_ADMIN_EMAIL = os.getenv("LANDING_ADMIN_EMAIL", DEFAULT_FROM_EMAIL)
