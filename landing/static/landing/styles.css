@@ -1021,6 +1021,7 @@ body.hero-video-open {
   box-shadow: 0 4px 4px rgba(0, 0, 0, 0.35);
   background: #fff;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
@@ -1043,13 +1044,15 @@ body.hero-video-open {
   align-items: center;
   justify-content: center;
   width: 100%;
-  max-width: 420px;
+  max-width: 400px;
   min-height: 360px;
+  margin-inline: auto;
+  text-align: center;
 }
 
 .reservation-lock-shell {
   width: 100%;
-  max-width: 364px;
+  max-width: 400px;
   min-width: 0;
   margin: 0 auto;
   padding: 0;
@@ -1057,6 +1060,7 @@ body.hero-video-open {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
 
 .reservation-header {
@@ -1075,8 +1079,10 @@ body.hero-video-open {
   flex-direction: column;
   gap: 0;
   align-items: center;
-  width: min(100%, 364px);
+  width: 100%;
+  max-width: 400px;
   position: relative;
+  margin-inline: auto;
 }
 
 .toggle-proper-selector {
@@ -1158,6 +1164,7 @@ body.hero-video-open {
   font-family: "Neue Haas Unica", sans-serif;
   font-weight: 400;
   line-height: 1.2;
+  text-align: center;
   pointer-events: none;
 }
 
@@ -1218,28 +1225,37 @@ body.hero-video-open {
 .date-options {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 14px;
   margin-bottom: 0;
   width: 100%;
+  max-width: 400px;
   order: 1;
+  margin-inline: auto;
+  padding: 0;
+  text-align: center;
 }
 
 .radio-option {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 14px;
+  gap: 8px;
   min-height: auto;
   padding: 0;
+  margin: 0;
+  width: 100%;
   cursor: pointer;
   font-size: clamp(1rem, 0.88rem + 0.55vw, 1.3125rem);
   font-weight: 400;
   font-family: "Neue Haas Unica", sans-serif;
   color: #462850;
   letter-spacing: 0.5px;
+  text-align: center;
 }
 
 .reservation-form.materialize-scope .radio-option {
-  padding: 8px 10px;
+  padding: 8px 0;
   border-radius: 12px;
   transition: background-color 0.2s ease, transform 0.2s ease;
 }
@@ -1280,7 +1296,8 @@ body.hero-video-open {
 }
 
 .radio-option span {
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 .date-pager {
@@ -1292,45 +1309,49 @@ body.hero-video-open {
 }
 
 .reservation-form.materialize-scope .submit-arrow.btn {
-  width: min(100%, 240px);
-  max-width: 240px;
-  min-height: 58px;
+  width: min(100%, clamp(200px, 52%, 280px));
+  max-width: 280px;
+  height: clamp(40px, 4.5vw, 48px);
+  min-height: clamp(40px, 4.5vw, 48px);
+  padding: 0 clamp(16px, 2.4vw, 24px);
   border-radius: 999px;
-  background: #f5aa0a;
-  box-shadow: 0 10px 22px rgba(245, 170, 10, 0.24);
+  background: linear-gradient(180deg, #f6d77a, #efbf46);
+  box-shadow: 0 4px 12px rgba(245, 170, 10, 0.2);
   align-self: center;
   margin: 0 auto;
-  color: #2f2034;
-  border: 1px solid rgba(245, 170, 10, 0.8);
+  color: #523d09;
+  border: 1.5px solid #f5aa0a;
   text-transform: none;
 }
 
 .reservation-form.materialize-scope .submit-arrow:hover {
-  background: #f7b30f;
-  color: #2f2034;
-  border-color: rgba(247, 179, 15, 0.95);
+  background: linear-gradient(180deg, #f6d77a, #efbf46);
+  color: #523d09;
+  border-color: #f5aa0a;
+  box-shadow: 0 4px 12px rgba(245, 170, 10, 0.2);
+  transform: none;
 }
 
 .reservation-form.materialize-scope .submit-arrow:disabled {
-  background: #ece6cf;
-  color: rgba(70, 40, 80, 0.78);
-  border-color: rgba(70, 40, 80, 0.18);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  background: linear-gradient(180deg, #f6d77a, #efbf46);
+  color: #523d09;
+  border-color: #f5aa0a;
+  box-shadow: 0 4px 12px rgba(245, 170, 10, 0.2);
   cursor: not-allowed;
   transform: none;
-  opacity: 1;
+  opacity: 0.58;
 }
 
 .reservation-form.materialize-scope .submit-arrow:disabled:hover {
-  background: #ece6cf;
-  color: rgba(70, 40, 80, 0.78);
-  border-color: rgba(70, 40, 80, 0.18);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  background: linear-gradient(180deg, #f6d77a, #efbf46);
+  color: #523d09;
+  border-color: #f5aa0a;
+  box-shadow: 0 4px 12px rgba(245, 170, 10, 0.2);
   transform: none;
 }
 
 .reservation-form.materialize-scope .submit-arrow:disabled .arrow-icon {
-  color: rgba(70, 40, 80, 0.72);
+  color: currentColor;
 }
 
 .reservation-lock-shell:disabled .submit-arrow {
@@ -1871,6 +1892,7 @@ details[open] .faq-icon {
 
   .reservation-inner {
     width: 100%;
+    max-width: 400px;
     min-height: 332px;
   }
 
@@ -1884,14 +1906,16 @@ details[open] .faq-icon {
 
   .toggle-list-component {
     width: 100%;
+    max-width: 400px;
   }
 
   .reservation-lock-shell {
-    max-width: min(100%, 364px);
+    max-width: min(100%, 400px);
   }
 
   .date-options {
     width: 100%;
+    max-width: 400px;
   }
 
   .testimonials-carousel-shell {
@@ -2070,6 +2094,7 @@ details[open] .faq-icon {
   .reservation-inner {
     width: 100%;
     gap: 14px;
+    max-width: 400px;
     min-height: 304px;
   }
 
@@ -2084,14 +2109,16 @@ details[open] .faq-icon {
 
   .toggle-list-component {
     width: 100%;
+    max-width: 400px;
   }
 
   .reservation-lock-shell {
-    max-width: min(100%, 364px);
+    max-width: min(100%, 400px);
   }
 
   .date-options {
     width: 100%;
+    max-width: 400px;
     gap: 12px;
   }
 
