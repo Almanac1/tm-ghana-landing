@@ -126,7 +126,7 @@ const watchVideoBtn = document.getElementById('watchVideoBtn');
 const heroVideoModal = document.getElementById('heroVideoModal');
 const closeHeroVideoBtn = document.getElementById('closeHeroVideo');
 const heroVideoFrame = document.getElementById('heroVideoFrame');
-const heroVideoUrl = 'https://www.youtube.com/embed/7ysWTw9Y0TM?autoplay=1&rel=0';
+const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc?autoplay=1&rel=0';
 
 if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let lastFocusedElement = null;
