@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
+from decouple import config as env_config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -83,6 +84,20 @@ DATABASES = {
     }
 }
 
+USE_POSTGRES = env_config("USE_POSTGRES", default=os.getenv("USE_POSTGRES", "False"), cast=bool)
+DB_NAME = env_config("DB_NAME", default=os.getenv("DB_NAME", ""))
+if USE_POSTGRES and DB_NAME:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': DB_NAME,
+            'USER': env_config("DB_USER", default=os.getenv("DB_USER", "")),
+            'PASSWORD': env_config("DB_PASSWORD", default=os.getenv("DB_PASSWORD", "")),
+            'HOST': env_config("DB_HOST", default=os.getenv("DB_HOST", "localhost")),
+            'PORT': env_config("DB_PORT", default=os.getenv("DB_PORT", "5432")),
+        }
+    }
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -131,18 +146,19 @@ STATICFILES_DIRS = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Email configuration (env-driven)
-EMAIL_BACKEND = os.getenv(
+EMAIL_BACKEND = env_config(
     "EMAIL_BACKEND",
-    os.getenv("DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"),
+    default=env_config("DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"),
 )
-EMAIL_HOST = os.getenv("EMAIL_HOST", os.getenv("DJANGO_EMAIL_HOST", ""))
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", os.getenv("DJANGO_EMAIL_PORT", "587")))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", os.getenv("DJANGO_EMAIL_HOST_USER", ""))
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", os.getenv("DJANGO_EMAIL_HOST_PASSWORD", ""))
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", os.getenv("DJANGO_EMAIL_USE_TLS", "true")).lower() in {"1", "true", "yes", "on"}
-EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", os.getenv("DJANGO_EMAIL_USE_SSL", "false")).lower() in {"1", "true", "yes", "on"}
-DEFAULT_FROM_EMAIL = os.getenv(
+EMAIL_HOST = env_config("EMAIL_HOST", default=env_config("DJANGO_EMAIL_HOST", default="smtp.gmail.com"))
+EMAIL_PORT = env_config("EMAIL_PORT", default=env_config("DJANGO_EMAIL_PORT", default="587"), cast=int)
+EMAIL_HOST_USER = env_config("EMAIL_HOST_USER", default=env_config("DJANGO_EMAIL_HOST_USER", default=""))
+EMAIL_HOST_PASSWORD = env_config("EMAIL_HOST_PASSWORD", default=env_config("DJANGO_EMAIL_HOST_PASSWORD", default=""))
+EMAIL_USE_TLS = env_config("EMAIL_USE_TLS", default=env_config("DJANGO_EMAIL_USE_TLS", default="True"), cast=bool)
+EMAIL_USE_SSL = env_config("EMAIL_USE_SSL", default=env_config("DJANGO_EMAIL_USE_SSL", default="False"), cast=bool)
+DEFAULT_FROM_EMAIL = env_config(
     "DEFAULT_FROM_EMAIL",
-    os.getenv("DJANGO_DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@example.com"),
+    default=env_config("DJANGO_DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER or "no-reply@example.com"),
 )
-LANDING_ADMIN_EMAIL = os.getenv("LANDING_ADMIN_EMAIL", DEFAULT_FROM_EMAIL)
+SERVER_EMAIL = env_config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
+LANDING_ADMIN_EMAIL = env_config("LANDING_ADMIN_EMAIL", default=DEFAULT_FROM_EMAIL)

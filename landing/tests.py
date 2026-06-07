@@ -48,6 +48,9 @@ class ReservationEmailFlowTests(TestCase):
         visitor_email = mail.outbox[1]
 
         self.assertEqual(admin_email.to, ["instructor@test.local"])
+        self.assertEqual(admin_email.reply_to, ["ada@example.com"])
+        self.assertEqual(admin_email.subject, "New registration entry from Ada Lovelace")
+        self.assertIn("A new registration entry has been made.", admin_email.body)
         self.assertIn("Full name: Ada Lovelace", admin_email.body)
         self.assertIn("First name: Ada", admin_email.body)
         self.assertIn("Email: ada@example.com", admin_email.body)
@@ -56,7 +59,9 @@ class ReservationEmailFlowTests(TestCase):
         self.assertIn("Reservation date: Wednesday, November 12", admin_email.body)
 
         self.assertEqual(visitor_email.to, ["ada@example.com"])
+        self.assertEqual(visitor_email.subject, "We received your meditation reservation")
         self.assertIn("Hi Ada,", visitor_email.body)
+        self.assertIn("Your registration has been received.", visitor_email.body)
         self.assertIn("Selected session: Physical Session", visitor_email.body)
         self.assertIn("Selected date: Wednesday, November 12", visitor_email.body)
 

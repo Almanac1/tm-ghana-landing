@@ -103,7 +103,7 @@ def _send_submission_emails(submission: Submission) -> None:
         submission.session_date, submission.get_session_date_display()
     )
 
-    admin_subject = f"New TM landing submission from {submission.name}"
+    admin_subject = f"New registration entry from {submission.name}"
     admin_body = render_to_string(
         "landing/emails/admin_submission_notification.txt",
         {
@@ -130,6 +130,7 @@ def _send_submission_emails(submission: Submission) -> None:
         body=admin_body,
         from_email=from_email,
         to=admin_to,
+        reply_to=[submission.email],
     ).send(fail_silently=False)
 
     EmailMultiAlternatives(

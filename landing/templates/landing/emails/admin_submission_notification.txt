@@ -1,4 +1,4 @@
-A new landing page submission was received.
+A new registration entry has been made.
 
 Full name: {{ submission.name }}
 First name: {{ first_name }}

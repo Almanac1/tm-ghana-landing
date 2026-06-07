@@ -131,13 +131,17 @@ const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc?autoplay=1&rel=0
 if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let lastFocusedElement = null;
 
-  const setHeroVideoOpenState = (isOpen) => {
+  if (heroVideoModal.parentElement !== document.body) {
+    document.body.appendChild(heroVideoModal);
+  }
+
+  const setHeroVideoOpenState = (isOpen, videoUrl = heroVideoUrl) => {
     heroVideoModal.classList.toggle('is-open', isOpen);
     heroVideoModal.setAttribute('aria-hidden', String(!isOpen));
     document.body.classList.toggle('hero-video-open', isOpen);
 
     if (isOpen) {
-      heroVideoFrame.src = heroVideoUrl;
+      heroVideoFrame.src = videoUrl;
       window.setTimeout(() => closeHeroVideoBtn.focus(), 0);
     } else {
       heroVideoFrame.src = '';
@@ -148,6 +152,22 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   watchVideoBtn.addEventListener('click', () => {
     lastFocusedElement = document.activeElement;
     setHeroVideoOpenState(true);
+  });
+
+  document.querySelectorAll('.testimonial-card[data-video-url]').forEach(card => {
+    const openTestimonialVideo = () => {
+      lastFocusedElement = document.activeElement;
+      const videoUrl = `${card.dataset.videoUrl}?autoplay=1`;
+      setHeroVideoOpenState(true, videoUrl);
+    };
+
+    card.addEventListener('click', openTestimonialVideo);
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openTestimonialVideo();
+      }
+    });
   });
 
   closeHeroVideoBtn.addEventListener('click', () => {
