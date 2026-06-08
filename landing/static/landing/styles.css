@@ -1951,7 +1951,7 @@ details[open] .faq-icon {
 
   .booking-section {
     --booking-mobile-overlap: 90px;
-    --reservation-card-overlap: 80px;
+    --reservation-card-overlap: 96px;
     background:
       linear-gradient(
         180deg,
@@ -1959,9 +1959,9 @@ details[open] .faq-icon {
         rgba(200, 200, 210, 0.28) var(--booking-mobile-overlap) 100%
       );
     position: relative;
-    z-index: 5;
+    z-index: 2;
     margin-top: calc(var(--booking-mobile-overlap) * -1);
-    padding: 48px 20px 112px;
+    padding: 48px 20px 28px;
   }
 
   .booking-wrapper {
@@ -2010,13 +2010,12 @@ details[open] .faq-icon {
 
   .reservation-form {
     position: relative;
-    z-index: 6;
+    z-index: 3;
     width: min(100%, 100%);
     max-width: 100%;
     min-height: 382px;
     padding: 24px;
     margin-bottom: calc(var(--reservation-card-overlap) * -1);
-    transform: translateY(var(--reservation-card-overlap));
   }
 
 
@@ -2087,7 +2086,7 @@ details[open] .faq-icon {
 
   .testimonials-section {
     margin-top: 0;
-    padding-top: 120px;
+    padding-top: 150px;
   }
 }
 
@@ -2213,13 +2212,13 @@ details[open] .faq-icon {
 
   .booking-section {
     --booking-mobile-overlap: 110px;
-    --reservation-card-overlap: 92px;
-    padding: 56px 16px 112px;
+    --reservation-card-overlap: 112px;
+    padding: 56px 16px 32px;
   }
 
   .testimonials-section {
     margin-top: 0;
-    padding-top: 136px;
+    padding-top: 172px;
   }
 
   .date-info {
