@@ -27,7 +27,7 @@ class ReservationEmailFlowTests(TestCase):
         reservation_payload = {
             "form_type": "reservation",
             "reservation-session_type": Reservation.SessionType.PHYSICAL,
-            "reservation-session_date": Reservation.SessionDate.NOV12,
+            "reservation-session_date": Reservation.SessionDate.JUN10_2026,
             "measured_height": "450",
         }
         reservation_response = self.client.post(reverse("home"), data=reservation_payload)
@@ -40,7 +40,7 @@ class ReservationEmailFlowTests(TestCase):
         self.assertEqual(submission.email, "ada@example.com")
         self.assertEqual(submission.phone, "2335550102")
         self.assertEqual(submission.session_type, Reservation.SessionType.PHYSICAL)
-        self.assertEqual(submission.session_date, Reservation.SessionDate.NOV12)
+        self.assertEqual(submission.session_date, Reservation.SessionDate.JUN10_2026)
 
         self.assertEqual(len(mail.outbox), 2)
 
@@ -56,14 +56,14 @@ class ReservationEmailFlowTests(TestCase):
         self.assertIn("Email: ada@example.com", admin_email.body)
         self.assertIn("Phone: 2335550102", admin_email.body)
         self.assertIn("Session mode: Physical Session", admin_email.body)
-        self.assertIn("Reservation date: Wednesday, November 12", admin_email.body)
+        self.assertIn("Reservation date: Wednesday, June 10, 2026", admin_email.body)
 
         self.assertEqual(visitor_email.to, ["ada@example.com"])
         self.assertEqual(visitor_email.subject, "We received your meditation reservation")
         self.assertIn("Hi Ada,", visitor_email.body)
         self.assertIn("Your registration has been received.", visitor_email.body)
         self.assertIn("Selected session: Physical Session", visitor_email.body)
-        self.assertIn("Selected date: Wednesday, November 12", visitor_email.body)
+        self.assertIn("Selected date: Wednesday, June 10, 2026", visitor_email.body)
 
     def test_submission_still_succeeds_when_email_sending_fails(self):
         lead_payload = {
@@ -78,7 +78,7 @@ class ReservationEmailFlowTests(TestCase):
         reservation_payload = {
             "form_type": "reservation",
             "reservation-session_type": Reservation.SessionType.ONLINE,
-            "reservation-session_date": Reservation.SessionDate.NOV19,
+            "reservation-session_date": Reservation.SessionDate.JUN17_2026,
             "measured_height": "500",
         }
 
@@ -102,7 +102,7 @@ class ReservationEmailFlowTests(TestCase):
         reservation_payload = {
             "form_type": "reservation",
             "reservation-session_type": Reservation.SessionType.ONLINE,
-            "reservation-session_date": Reservation.SessionDate.NOV19,
+            "reservation-session_date": Reservation.SessionDate.JUN17_2026,
             "measured_height": "480",
         }
         response = self.client.post(reverse("home"), data=reservation_payload)
@@ -111,4 +111,4 @@ class ReservationEmailFlowTests(TestCase):
         self.assertEqual(len(mail.outbox), 2)
         visitor_email = mail.outbox[1]
         self.assertIn("Selected session: Online Session", visitor_email.body)
-        self.assertIn("Selected date: Saturday, November 22", visitor_email.body)
+        self.assertIn("Selected date: Wednesday, June 17, 2026", visitor_email.body)

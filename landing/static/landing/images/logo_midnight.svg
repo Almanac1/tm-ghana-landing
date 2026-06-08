@@ -19,7 +19,7 @@
       }
 
       .cls-3 {
-        fill: #462850;
+        fill: currentColor;
       }
     </style>
     <clipPath id="clippath">

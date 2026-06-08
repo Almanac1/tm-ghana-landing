@@ -50,16 +50,16 @@ logger = logging.getLogger(__name__)
 
 SESSION_DATE_LABELS = {
     Reservation.SessionType.PHYSICAL: {
-        Reservation.SessionDate.NOV5: "Wednesday, November 5",
-        Reservation.SessionDate.NOV12: "Wednesday, November 12",
-        Reservation.SessionDate.NOV19: "Wednesday, November 19",
-        Reservation.SessionDate.NOV25: "Wednesday, November 25",
+        Reservation.SessionDate.JUN3_2026: "Wednesday, June 3, 2026",
+        Reservation.SessionDate.JUN10_2026: "Wednesday, June 10, 2026",
+        Reservation.SessionDate.JUN17_2026: "Wednesday, June 17, 2026",
+        Reservation.SessionDate.JUN24_2026: "Wednesday, June 24, 2026",
     },
     Reservation.SessionType.ONLINE: {
-        Reservation.SessionDate.NOV5: "Saturday, November 5",
-        Reservation.SessionDate.NOV12: "Saturday, November 15",
-        Reservation.SessionDate.NOV19: "Saturday, November 22",
-        Reservation.SessionDate.NOV25: "Saturday, November 29",
+        Reservation.SessionDate.JUN3_2026: "Wednesday, June 3, 2026",
+        Reservation.SessionDate.JUN10_2026: "Wednesday, June 10, 2026",
+        Reservation.SessionDate.JUN17_2026: "Wednesday, June 17, 2026",
+        Reservation.SessionDate.JUN24_2026: "Wednesday, June 24, 2026",
     },
 }
 
