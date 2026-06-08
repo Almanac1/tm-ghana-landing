@@ -749,6 +749,15 @@ body.hero-video-open {
     color 0.2s ease;
 }
 
+.contact-form.materialize-scope .form-group input,
+.contact-form.materialize-scope .form-group select {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #d8ccd6;
+  border-radius: 0;
+  box-shadow: none;
+}
+
 .contact-form.materialize-scope .material-field input,
 .contact-form.materialize-scope .material-field select {
   padding: 16px 0 13px;
