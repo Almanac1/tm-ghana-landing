@@ -1906,7 +1906,7 @@ details[open] .faq-icon {
   .hero {
     height: 578px;
     min-height: 578px;
-    padding: 106px 18px 20px;
+    padding: 106px 18px 118px;
     transition: margin-top 0.3s ease;
   }
 
@@ -1944,7 +1944,17 @@ details[open] .faq-icon {
   }
 
   .booking-section {
-    padding: 84px 20px 90px;
+    --booking-mobile-overlap: 90px;
+    background:
+      linear-gradient(
+        180deg,
+        transparent 0 var(--booking-mobile-overlap),
+        rgba(200, 200, 210, 0.28) var(--booking-mobile-overlap) 100%
+      );
+    position: relative;
+    z-index: 5;
+    margin-top: calc(var(--booking-mobile-overlap) * -1);
+    padding: 48px 20px 90px;
   }
 
   .booking-wrapper {
@@ -1959,8 +1969,10 @@ details[open] .faq-icon {
     max-width: 100%;
     min-height: auto;
     padding: 28px 18px;
-    margin-top: -96px;
+    margin-top: 0;
     margin-bottom: 12px;
+    margin-left: auto;
+    margin-right: auto;
     gap: 12px;
   }
 
@@ -2079,6 +2091,7 @@ details[open] .faq-icon {
     height: 488px;
     min-height: 488px;
     padding-top: 96px;
+    padding-bottom: 126px;
   }
 
   .header.menu-open + .hero {
@@ -2155,7 +2168,7 @@ details[open] .faq-icon {
     --contact-form-inline-pad: clamp(4px, 2.2vw, 10px);
     padding: 22px 14px;
     min-height: auto;
-    margin-top: -68px;
+    margin-top: 0;
     margin-bottom: 12px;
     gap: 10px;
   }
@@ -2183,7 +2196,8 @@ details[open] .faq-icon {
   }
 
   .booking-section {
-    padding: 72px 16px 82px;
+    --booking-mobile-overlap: 110px;
+    padding: 56px 16px 82px;
   }
 
   .testimonials-section {
