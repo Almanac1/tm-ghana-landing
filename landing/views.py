@@ -22,7 +22,7 @@ BENEFITS = [
 FAQS = [
     {
         "question": '"Do you have to believe in TM for it to work?"',
-        "answer": "No, belief is not required. TM is a technique based on simple mechanics. Research shows that TM works regardless of belief, expectations, or concentration. It's the practice itself that produces the benefits.",
+        "answer": "No, belief is not required. TM is a technique based on simple mechanics. Research shows that TM works regardless of your belief and philosophy. It's the practice itself that produces the benefits.",
     },
     {
         "question": '"Is TM a religious or spiritual practice?"',
@@ -33,12 +33,12 @@ FAQS = [
         "answer": "TM only requires 20 minutes, twice a day. Many busy professionals find that TM actually saves time by increasing productivity and reducing stress-related issues.",
     },
     {
-        "question": "\"Isn't mediation about clearing the mind?\"",
+        "question": "\"Isn't meditation about clearing the mind?\"",
         "answer": "No. TM is not about clearing the mind or concentrating. It's a natural, effortless technique that allows the mind to settle to a state of deep rest and coherence.",
     },
     {
         "question": '"Do I have to sit cross-legged or chant out loud?"',
-        "answer": "No. TM is practiced sitting comfortably in any chair with eyes closed. There's no chanting, no special postures, and no complex techniques to learn.",
+        "answer": "No. TM is practiced sitting comfortably in any chair with eyes closed. There’s no chanting, no special postures. It is just a simple effortless technique.",
     },
 ]
 
