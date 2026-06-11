@@ -21,7 +21,7 @@ BENEFITS = [
 
 FAQS = [
     {
-        "question": '"Dont you have to believe in TM for it to work?"',
+        "question": '"Do you have to believe in TM for it to work?"',
         "answer": "No, belief is not required. TM is a technique based on simple mechanics. Research shows that TM works regardless of belief, expectations, or concentration. It's the practice itself that produces the benefits.",
     },
     {
