@@ -50,16 +50,17 @@ logger = logging.getLogger(__name__)
 
 SESSION_DATE_LABELS = {
     Reservation.SessionType.PHYSICAL: {
-        Reservation.SessionDate.JUN3_2026: "Wednesday, June 3, 2026",
-        Reservation.SessionDate.JUN10_2026: "Wednesday, June 10, 2026",
-        Reservation.SessionDate.JUN17_2026: "Wednesday, June 17, 2026",
-        Reservation.SessionDate.JUN24_2026: "Wednesday, June 24, 2026",
+        Reservation.SessionDate.JUL4_2026: "Saturday, July 4, 2026",
+        Reservation.SessionDate.JUL11_2026: "Saturday, July 11, 2026",
+        Reservation.SessionDate.JUL18_2026: "Saturday, July 18, 2026",
+        Reservation.SessionDate.JUL25_2026: "Saturday, July 25, 2026",
     },
     Reservation.SessionType.ONLINE: {
-        Reservation.SessionDate.JUN3_2026: "Wednesday, June 3, 2026",
-        Reservation.SessionDate.JUN10_2026: "Wednesday, June 10, 2026",
-        Reservation.SessionDate.JUN17_2026: "Wednesday, June 17, 2026",
-        Reservation.SessionDate.JUN24_2026: "Wednesday, June 24, 2026",
+        Reservation.SessionDate.JUL1_2026: "Wednesday, July 1, 2026",
+        Reservation.SessionDate.JUL8_2026: "Wednesday, July 8, 2026",
+        Reservation.SessionDate.JUL15_2026: "Wednesday, July 15, 2026",
+        Reservation.SessionDate.JUL22_2026: "Wednesday, July 22, 2026",
+        Reservation.SessionDate.JUL29_2026: "Wednesday, July 29, 2026",
     },
 }
 

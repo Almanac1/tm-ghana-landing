@@ -22,10 +22,15 @@ class Reservation(models.Model):
         ONLINE = "online", "Online Session"
 
     class SessionDate(models.TextChoices):
-        JUN3_2026 = "2026-06-03", "Wednesday, June 3, 2026"
-        JUN10_2026 = "2026-06-10", "Wednesday, June 10, 2026"
-        JUN17_2026 = "2026-06-17", "Wednesday, June 17, 2026"
-        JUN24_2026 = "2026-06-24", "Wednesday, June 24, 2026"
+        JUL1_2026 = "2026-07-01", "Wednesday, July 1, 2026"
+        JUL4_2026 = "2026-07-04", "Saturday, July 4, 2026"
+        JUL8_2026 = "2026-07-08", "Wednesday, July 8, 2026"
+        JUL11_2026 = "2026-07-11", "Saturday, July 11, 2026"
+        JUL15_2026 = "2026-07-15", "Wednesday, July 15, 2026"
+        JUL18_2026 = "2026-07-18", "Saturday, July 18, 2026"
+        JUL22_2026 = "2026-07-22", "Wednesday, July 22, 2026"
+        JUL25_2026 = "2026-07-25", "Saturday, July 25, 2026"
+        JUL29_2026 = "2026-07-29", "Wednesday, July 29, 2026"
 
     session_date = models.CharField(max_length=10, choices=SessionDate.choices)
     session_type = models.CharField(max_length=12, choices=SessionType.choices, default=SessionType.PHYSICAL)

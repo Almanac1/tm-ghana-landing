@@ -201,16 +201,17 @@ const reservationSubmitBtn = document.getElementById('reservationSubmitBtn');
 const reservationUnlockNote = document.getElementById('reservationUnlockNote');
 const reservationDateOptionsByMode = {
   physical: [
-    { value: '2026-06-03', label: 'Wednesday, June 3' },
-    { value: '2026-06-10', label: 'Wednesday, June 10' },
-    { value: '2026-06-17', label: 'Wednesday, June 17' },
-    { value: '2026-06-24', label: 'Wednesday, June 24' }
+    { value: '2026-07-04', label: 'Saturday, July 4' },
+    { value: '2026-07-11', label: 'Saturday, July 11' },
+    { value: '2026-07-18', label: 'Saturday, July 18' },
+    { value: '2026-07-25', label: 'Saturday, July 25' }
   ],
   online: [
-    { value: '2026-06-03', label: 'Wednesday, June 3' },
-    { value: '2026-06-10', label: 'Wednesday, June 10' },
-    { value: '2026-06-17', label: 'Wednesday, June 17' },
-    { value: '2026-06-24', label: 'Wednesday, June 24' }
+    { value: '2026-07-01', label: 'Wednesday, July 1' },
+    { value: '2026-07-08', label: 'Wednesday, July 8' },
+    { value: '2026-07-15', label: 'Wednesday, July 15' },
+    { value: '2026-07-22', label: 'Wednesday, July 22' },
+    { value: '2026-07-29', label: 'Wednesday, July 29' }
   ]
 };
 const reservationInteractiveControls = reservationFormCard
