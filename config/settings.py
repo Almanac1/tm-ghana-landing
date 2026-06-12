@@ -30,6 +30,8 @@ DEBUG = True
 ALLOWED_HOSTS = ['OjemeOjikutu.pythonanywhere.com',
                  '127.0.0.1', 'tmnigeria.pythonanywhere.com', 'www.tmnigeria.com']
 
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
 # Application definition
 
 INSTALLED_APPS = [

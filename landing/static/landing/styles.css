@@ -474,6 +474,28 @@ summary {
   display: block;
 }
 
+.hero-video-fallback {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 2;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(7, 18, 24, 0.88);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hero-video-fallback[hidden] {
+  display: none;
+}
+
 .hero-video-close {
   position: absolute;
   top: -18px;

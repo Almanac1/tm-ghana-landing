@@ -126,14 +126,65 @@ const watchVideoBtn = document.getElementById('watchVideoBtn');
 const heroVideoModal = document.getElementById('heroVideoModal');
 const closeHeroVideoBtn = document.getElementById('closeHeroVideo');
 const heroVideoFrame = document.getElementById('heroVideoFrame');
-const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc?autoplay=1&rel=0';
+const heroVideoFallback = document.getElementById('heroVideoFallback');
+const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc';
 
 if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let lastFocusedElement = null;
+  let activeFallbackUrl = 'https://www.youtube.com/watch?v=AL_c-sV9zXc';
 
   if (heroVideoModal.parentElement !== document.body) {
     document.body.appendChild(heroVideoModal);
   }
+
+  const getYouTubeVideoId = (videoUrl) => {
+    try {
+      const url = new URL(videoUrl, window.location.href);
+      if (url.hostname.includes('youtu.be')) {
+        return url.pathname.split('/').filter(Boolean)[0] || '';
+      }
+      if (url.pathname.startsWith('/embed/')) {
+        return url.pathname.split('/').filter(Boolean)[1] || '';
+      }
+      return url.searchParams.get('v') || '';
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const buildYouTubeEmbedUrl = (videoUrl) => {
+    const videoId = getYouTubeVideoId(videoUrl);
+    const params = new URLSearchParams({
+      autoplay: '1',
+      rel: '0',
+      modestbranding: '1',
+      playsinline: '1',
+      origin: window.location.origin,
+      widget_referrer: window.location.href
+    });
+
+    try {
+      const url = new URL(videoUrl, window.location.href);
+      url.searchParams.forEach((value, key) => {
+        params.set(key, value);
+      });
+    } catch (error) {
+      // Fall back to the required YouTube embed format below.
+    }
+
+    return `https://www.youtube.com/embed/${videoId || 'AL_c-sV9zXc'}?${params.toString()}`;
+  };
+
+  const buildYouTubeWatchUrl = (videoUrl) => {
+    const videoId = getYouTubeVideoId(videoUrl) || 'AL_c-sV9zXc';
+    return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+  };
+
+  const setVideoFallbackState = (isVisible, fallbackUrl = buildYouTubeWatchUrl(heroVideoUrl)) => {
+    if (!heroVideoFallback) return;
+    heroVideoFallback.href = fallbackUrl;
+    heroVideoFallback.hidden = !isVisible;
+  };
 
   const setHeroVideoOpenState = (isOpen, videoUrl = heroVideoUrl) => {
     heroVideoModal.classList.toggle('is-open', isOpen);
@@ -141,27 +192,40 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     document.body.classList.toggle('hero-video-open', isOpen);
 
     if (isOpen) {
-      heroVideoFrame.src = videoUrl;
+      const embedUrl = buildYouTubeEmbedUrl(videoUrl);
+      const fallbackUrl = buildYouTubeWatchUrl(embedUrl);
+      activeFallbackUrl = fallbackUrl;
+      setVideoFallbackState(false, fallbackUrl);
+      heroVideoFrame.src = embedUrl;
       window.setTimeout(() => closeHeroVideoBtn.focus(), 0);
     } else {
       heroVideoFrame.src = '';
+      setVideoFallbackState(false);
       lastFocusedElement?.focus?.();
     }
   };
 
-  watchVideoBtn.addEventListener('click', () => {
+  heroVideoFrame.addEventListener('error', () => {
+    setVideoFallbackState(true, activeFallbackUrl);
+  });
+
+  watchVideoBtn.addEventListener('click', (event) => {
+    event.preventDefault();
     lastFocusedElement = document.activeElement;
-    setHeroVideoOpenState(true);
+    setHeroVideoOpenState(true, watchVideoBtn.dataset.videoUrl || heroVideoUrl);
   });
 
   document.querySelectorAll('.testimonial-card[data-video-url]').forEach(card => {
     const openTestimonialVideo = () => {
       lastFocusedElement = document.activeElement;
-      const videoUrl = `${card.dataset.videoUrl}?autoplay=1`;
+      const videoUrl = card.dataset.videoUrl || heroVideoUrl;
       setHeroVideoOpenState(true, videoUrl);
     };
 
-    card.addEventListener('click', openTestimonialVideo);
+    card.addEventListener('click', (event) => {
+      event.preventDefault();
+      openTestimonialVideo();
+    });
     card.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();

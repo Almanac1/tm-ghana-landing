@@ -58,7 +58,7 @@
             <span>Work Better.</span>
         </h1>
         <div class="hero-cta">
-          <button type="button" class="hero-secondary-btn" id="watchVideoBtn" aria-haspopup="dialog" aria-controls="heroVideoModal">
+          <button type="button" class="hero-secondary-btn" id="watchVideoBtn" aria-haspopup="dialog" aria-controls="heroVideoModal" data-video-url="https://www.youtube.com/embed/AL_c-sV9zXc">
             Watch Video
           </button>
         </div>
@@ -75,9 +75,12 @@
             id="heroVideoFrame"
             src=""
             title="Transcendental Meditation introduction video"
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowfullscreen
             referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          <a class="hero-video-fallback" id="heroVideoFallback" href="https://www.youtube.com/watch?v=AL_c-sV9zXc" target="_blank" rel="noopener noreferrer" hidden>
+            Open video on YouTube
+          </a>
         </div>
       </div>
     </div>
@@ -349,6 +352,6 @@
     </div>
   </footer>
 
-  <script src="{% static 'landing/app.js' %}"></script>
+  <script src="{% static 'landing/app.js' %}?v=20260612-youtube-safari-referrer"></script>
 </body>
 </html>

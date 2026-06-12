@@ -126,14 +126,65 @@ const watchVideoBtn = document.getElementById('watchVideoBtn');
 const heroVideoModal = document.getElementById('heroVideoModal');
 const closeHeroVideoBtn = document.getElementById('closeHeroVideo');
 const heroVideoFrame = document.getElementById('heroVideoFrame');
-const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc?autoplay=1&rel=0';
+const heroVideoFallback = document.getElementById('heroVideoFallback');
+const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc';
 
 if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let lastFocusedElement = null;
+  let activeFallbackUrl = 'https://www.youtube.com/watch?v=AL_c-sV9zXc';
 
   if (heroVideoModal.parentElement !== document.body) {
     document.body.appendChild(heroVideoModal);
   }
+
+  const getYouTubeVideoId = (videoUrl) => {
+    try {
+      const url = new URL(videoUrl, window.location.href);
+      if (url.hostname.includes('youtu.be')) {
+        return url.pathname.split('/').filter(Boolean)[0] || '';
+      }
+      if (url.pathname.startsWith('/embed/')) {
+        return url.pathname.split('/').filter(Boolean)[1] || '';
+      }
+      return url.searchParams.get('v') || '';
+    } catch (error) {
+      return '';
+    }
+  };
+
+  const buildYouTubeEmbedUrl = (videoUrl) => {
+    const videoId = getYouTubeVideoId(videoUrl);
+    const params = new URLSearchParams({
+      autoplay: '1',
+      rel: '0',
+      modestbranding: '1',
+      playsinline: '1',
+      origin: window.location.origin,
+      widget_referrer: window.location.href
+    });
+
+    try {
+      const url = new URL(videoUrl, window.location.href);
+      url.searchParams.forEach((value, key) => {
+        params.set(key, value);
+      });
+    } catch (error) {
+      // Fall back to the required YouTube embed format below.
+    }
+
+    return `https://www.youtube.com/embed/${videoId || 'AL_c-sV9zXc'}?${params.toString()}`;
+  };
+
+  const buildYouTubeWatchUrl = (videoUrl) => {
+    const videoId = getYouTubeVideoId(videoUrl) || 'AL_c-sV9zXc';
+    return `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+  };
+
+  const setVideoFallbackState = (isVisible, fallbackUrl = buildYouTubeWatchUrl(heroVideoUrl)) => {
+    if (!heroVideoFallback) return;
+    heroVideoFallback.href = fallbackUrl;
+    heroVideoFallback.hidden = !isVisible;
+  };
 
   const setHeroVideoOpenState = (isOpen, videoUrl = heroVideoUrl) => {
     heroVideoModal.classList.toggle('is-open', isOpen);
@@ -141,27 +192,40 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     document.body.classList.toggle('hero-video-open', isOpen);
 
     if (isOpen) {
-      heroVideoFrame.src = videoUrl;
+      const embedUrl = buildYouTubeEmbedUrl(videoUrl);
+      const fallbackUrl = buildYouTubeWatchUrl(embedUrl);
+      activeFallbackUrl = fallbackUrl;
+      setVideoFallbackState(false, fallbackUrl);
+      heroVideoFrame.src = embedUrl;
       window.setTimeout(() => closeHeroVideoBtn.focus(), 0);
     } else {
       heroVideoFrame.src = '';
+      setVideoFallbackState(false);
       lastFocusedElement?.focus?.();
     }
   };
 
-  watchVideoBtn.addEventListener('click', () => {
+  heroVideoFrame.addEventListener('error', () => {
+    setVideoFallbackState(true, activeFallbackUrl);
+  });
+
+  watchVideoBtn.addEventListener('click', (event) => {
+    event.preventDefault();
     lastFocusedElement = document.activeElement;
-    setHeroVideoOpenState(true);
+    setHeroVideoOpenState(true, watchVideoBtn.dataset.videoUrl || heroVideoUrl);
   });
 
   document.querySelectorAll('.testimonial-card[data-video-url]').forEach(card => {
     const openTestimonialVideo = () => {
       lastFocusedElement = document.activeElement;
-      const videoUrl = `${card.dataset.videoUrl}?autoplay=1`;
+      const videoUrl = card.dataset.videoUrl || heroVideoUrl;
       setHeroVideoOpenState(true, videoUrl);
     };
 
-    card.addEventListener('click', openTestimonialVideo);
+    card.addEventListener('click', (event) => {
+      event.preventDefault();
+      openTestimonialVideo();
+    });
     card.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
@@ -199,19 +263,20 @@ const reservationSessionControl = document.getElementById('reservationSessionCon
 const reservationDateOptions = document.getElementById('reservationDateOptions');
 const reservationSubmitBtn = document.getElementById('reservationSubmitBtn');
 const reservationUnlockNote = document.getElementById('reservationUnlockNote');
-const reservationDateLabelMap = {
-  physical: {
-    nov5: 'Wednesday, November 5',
-    nov12: 'Wednesday, November 12',
-    nov19: 'Wednesday, November 19',
-    nov25: 'Wednesday, November 25'
-  },
-  online: {
-    nov5: 'Saturday, November 5',
-    nov12: 'Saturday, November 15',
-    nov19: 'Saturday, November 22',
-    nov25: 'Saturday, November 29'
-  }
+const reservationDateOptionsByMode = {
+  physical: [
+    { value: '2026-07-04', label: 'Saturday, July 4' },
+    { value: '2026-07-11', label: 'Saturday, July 11' },
+    { value: '2026-07-18', label: 'Saturday, July 18' },
+    { value: '2026-07-25', label: 'Saturday, July 25' }
+  ],
+  online: [
+    { value: '2026-07-01', label: 'Wednesday, July 1' },
+    { value: '2026-07-08', label: 'Wednesday, July 8' },
+    { value: '2026-07-15', label: 'Wednesday, July 15' },
+    { value: '2026-07-22', label: 'Wednesday, July 22' },
+    { value: '2026-07-29', label: 'Wednesday, July 29' }
+  ]
 };
 const reservationInteractiveControls = reservationFormCard
   ? Array.from(
@@ -243,6 +308,12 @@ const setReservationLockedState = (isLocked) => {
   if (reservationDateOptions) {
     reservationDateOptions.classList.toggle('is-locked', isLocked);
     reservationDateOptions.setAttribute('aria-disabled', String(isLocked));
+    reservationDateOptions.querySelectorAll('.radio-option').forEach(option => {
+      option.classList.toggle('is-disabled', isLocked);
+    });
+    reservationDateOptions.querySelectorAll('input[type="radio"]').forEach(input => {
+      input.disabled = isLocked;
+    });
   }
 
   reservationInteractiveControls.forEach(control => {
@@ -268,7 +339,45 @@ const syncReservationPills = () => {
   });
 };
 
-const applyReservationSessionMode = (value) => {
+const renderReservationDateOptions = (sessionMode, clearSelection = false) => {
+  if (reservationDateOptions) {
+    const normalizedMode = sessionMode === 'online' ? 'online' : 'physical';
+    const options = reservationDateOptionsByMode[normalizedMode] || reservationDateOptionsByMode.physical;
+    const fieldName = reservationDateOptions.dataset.dateFieldName || 'reservation-session_date';
+    const isLocked = reservationLockShell?.disabled ?? false;
+    const selectedDate = clearSelection ? '' : (reservationDateOptions.dataset.selectedDate || '');
+    reservationDateOptions.dataset.sessionMode = normalizedMode;
+
+    reservationDateOptions.innerHTML = '';
+    options.forEach((option, index) => {
+      const optionId = `reservation-session-date-${normalizedMode}-${index}`;
+
+      const label = document.createElement('label');
+      label.className = `radio-option${isLocked ? ' is-disabled' : ''}`;
+
+      const input = document.createElement('input');
+      input.type = 'radio';
+      input.name = fieldName;
+      input.value = option.value;
+      input.id = optionId;
+      input.checked = selectedDate === option.value;
+      input.disabled = isLocked;
+
+      const text = document.createElement('span');
+      text.textContent = option.label;
+
+      label.appendChild(input);
+      label.appendChild(text);
+      reservationDateOptions.appendChild(label);
+    });
+
+    if (clearSelection) {
+      reservationDateOptions.dataset.selectedDate = '';
+    }
+  }
+};
+
+const applyReservationSessionMode = (value, clearSelection = false) => {
   if (!reservationToggleInputs.length || !value) return;
   const matchedInput = Array.from(reservationToggleInputs).find(input => input.value === value);
   if (!matchedInput) return;
@@ -276,24 +385,21 @@ const applyReservationSessionMode = (value) => {
   if (reservationSessionType) {
     reservationSessionType.value = value;
   }
-  if (reservationDateOptions) {
-    const labelsByDate = reservationDateLabelMap[value] || reservationDateLabelMap.physical;
-    reservationDateOptions.querySelectorAll('.radio-option').forEach(option => {
-      const input = option.querySelector('input[type="radio"]');
-      const label = option.querySelector('span');
-      if (!input || !label) return;
-      label.textContent = labelsByDate[input.value] || label.textContent;
-    });
-  }
+  renderReservationDateOptions(value, clearSelection);
   syncReservationPills();
 };
 
+if (reservationDateOptions) {
+  reservationDateOptions.addEventListener('change', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.type !== 'radio') return;
+    reservationDateOptions.dataset.selectedDate = target.value;
+  });
+}
+
 reservationToggleInputs.forEach(input => {
   input.addEventListener('change', () => {
-    syncReservationPills();
-    if (reservationSessionType) {
-      reservationSessionType.value = input.value;
-    }
+    applyReservationSessionMode(input.value, true);
   });
 });
 
@@ -311,7 +417,10 @@ if (reservationSessionType && !reservationSessionType.value) {
 }
 
 if (reservationSessionType && reservationToggleInputs.length) {
-  applyReservationSessionMode(reservationSessionType.value);
+  const activeMode = reservationDateOptions?.dataset.sessionMode || reservationSessionType.value;
+  applyReservationSessionMode(activeMode, false);
+} else if (reservationDateOptions) {
+  renderReservationDateOptions('physical', false);
 }
 
 if (reservationFormCard && reservationLockShell) {
