@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-*l%zm_&i64ee9a*$s_tqz22#sv(#vquc1=dd&_ijlk-zwa97*p
 DEBUG = True
 
 ALLOWED_HOSTS = ['OjemeOjikutu.pythonanywhere.com',
-                 '127.0.0.1', 'tmnigeria.pythonanywhere.com', 'www.tmnigeria.com']
+                 '127.0.0.1', 'tmnigeria.pythonanywhere.com', 'tmnigeria.com', 'www.tmnigeria.com']
 
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
