@@ -172,7 +172,7 @@
       </div>
 
       <!-- Reservation Form -->
-      <form class="form-card reservation-form materialize-scope{% if reservation_success %} is-success{% elif not lead_details_completed %} is-locked{% endif %}" method="post" id="reservationForm" data-lead-complete="{% if lead_details_completed %}true{% else %}false{% endif %}"{% if reservation_success.payload.measured_height %} style="height: {{ reservation_success.payload.measured_height }}px; min-height: {{ reservation_success.payload.measured_height }}px;"{% endif %}>
+      <form class="form-card reservation-form materialize-scope{% if reservation_success %} is-success{% elif not lead_details_completed %} is-locked{% endif %}" method="post" id="reservationForm" data-lead-complete="{% if lead_details_completed %}true{% else %}false{% endif %}"{% if reservation_success %} data-analytics-success="true" data-analytics-submission-id="{{ reservation_success.payload.submission_id }}" data-analytics-session-type="{{ reservation_success.payload.session_type }}" data-analytics-session-date="{{ reservation_success.payload.session_date }}"{% endif %}{% if reservation_success.payload.measured_height %} style="height: {{ reservation_success.payload.measured_height }}px; min-height: {{ reservation_success.payload.measured_height }}px;"{% endif %}>
         {% csrf_token %}
         <input type="hidden" name="form_type" value="reservation">
         <input type="hidden" name="measured_height" id="reservationMeasuredHeight" value="">
@@ -364,6 +364,6 @@
     </div>
   </footer>
 
-  <script src="{% static 'landing/app.js' %}?v=20260612-youtube-safari-referrer"></script>
+  <script src="{% static 'landing/app.js' %}?v=20260615-datalayer-events"></script>
 </body>
 </html>

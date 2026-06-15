@@ -1,3 +1,41 @@
+window.dataLayer = window.dataLayer || [];
+
+function pushDataLayerEvent(eventName, params = {}) {
+  window.dataLayer.push({
+    event: eventName,
+    ...params
+  });
+}
+
+const getSectionName = (element) => {
+  const section = element?.closest?.('section');
+  if (section?.id) return section.id;
+  if (element?.closest?.('.header')) return 'navigation';
+  if (element?.closest?.('.footer')) return 'footer';
+  return 'unknown';
+};
+
+const getReservationAnalyticsState = () => ({
+  selected_class_type: document.getElementById('reservation-session-type')?.value || undefined,
+  selected_session_date: document.getElementById('reservationDateOptions')?.dataset.selectedDate || undefined
+});
+
+const getSessionStorageItem = (key) => {
+  try {
+    return window.sessionStorage?.getItem(key);
+  } catch (error) {
+    return null;
+  }
+};
+
+const setSessionStorageItem = (key, value) => {
+  try {
+    window.sessionStorage?.setItem(key, value);
+  } catch (error) {
+    // Analytics dedupe should never block the site if storage is unavailable.
+  }
+};
+
 // Mobile Menu Toggle
 const header = document.querySelector('.header');
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -263,6 +301,7 @@ const reservationSessionControl = document.getElementById('reservationSessionCon
 const reservationDateOptions = document.getElementById('reservationDateOptions');
 const reservationSubmitBtn = document.getElementById('reservationSubmitBtn');
 const reservationUnlockNote = document.getElementById('reservationUnlockNote');
+let reservationFormStarted = false;
 const reservationDateOptionsByMode = {
   physical: [
     { value: '2026-07-04', label: 'Saturday, July 4' },
@@ -428,6 +467,65 @@ if (reservationFormCard && reservationLockShell) {
   setReservationLockedState(!leadComplete);
 }
 
+if (reservationFormCard && 'IntersectionObserver' in window) {
+  const reservationVisibilityObserver = new IntersectionObserver((entries, observerInstance) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+        pushDataLayerEvent('reserve_form_visible', {
+          section: 'reserve_form'
+        });
+        observerInstance.disconnect();
+      }
+    });
+  }, { threshold: [0.5] });
+
+  reservationVisibilityObserver.observe(reservationFormCard);
+} else if (reservationFormCard) {
+  pushDataLayerEvent('reserve_form_visible', {
+    section: 'reserve_form'
+  });
+}
+
+if (reservationFormCard) {
+  const pushFormStartEvent = (event) => {
+    if (reservationFormStarted) return;
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement || target instanceof HTMLButtonElement)) {
+      return;
+    }
+    if (target.disabled || target.type === 'hidden' || target.type === 'submit') {
+      return;
+    }
+
+    reservationFormStarted = true;
+    pushDataLayerEvent('form_start', {
+      form_name: 'reserve_your_spot',
+      ...getReservationAnalyticsState()
+    });
+  };
+
+  reservationFormCard.addEventListener('focusin', pushFormStartEvent);
+  reservationFormCard.addEventListener('change', pushFormStartEvent);
+  reservationFormCard.addEventListener('input', pushFormStartEvent);
+}
+
+if (reservationFormCard?.dataset.analyticsSuccess === 'true') {
+  const submissionId = reservationFormCard.dataset.analyticsSubmissionId || [
+    reservationFormCard.dataset.analyticsSessionType,
+    reservationFormCard.dataset.analyticsSessionDate
+  ].filter(Boolean).join(':');
+  const storageKey = `tmnigeria_form_submit_${submissionId}`;
+
+  if (submissionId && getSessionStorageItem(storageKey) !== 'true') {
+    pushDataLayerEvent('form_submit', {
+      form_name: 'reserve_your_spot',
+      selected_class_type: reservationFormCard.dataset.analyticsSessionType || undefined,
+      selected_session_date: reservationFormCard.dataset.analyticsSessionDate || undefined
+    });
+    setSessionStorageItem(storageKey, 'true');
+  }
+}
+
 if (reservationFormCard && reservationMeasuredHeight) {
   reservationFormCard.addEventListener('submit', (event) => {
     const submitter = event.submitter;
@@ -462,6 +560,51 @@ if (leadCountry && leadPhone && phonePrefix) {
 
   syncPhonePrefix();
 }
+
+document.addEventListener('click', (event) => {
+  const cta = event.target instanceof Element
+    ? event.target.closest('a, button')
+    : null;
+  if (!cta) return;
+
+  const buttonText = (cta.textContent || '').replace(/\s+/g, ' ').trim();
+  if (!/(reserve|learn tm|free intro|book)/i.test(buttonText)) return;
+
+  const destination = cta instanceof HTMLAnchorElement
+    ? cta.getAttribute('href') || ''
+    : cta.dataset.videoUrl || cta.getAttribute('formaction') || cta.closest('form')?.getAttribute('action') || window.location.pathname;
+
+  pushDataLayerEvent('reserve_cta_click', {
+    button_text: buttonText,
+    section: getSectionName(cta),
+    destination
+  });
+});
+
+const scrollDepthThresholds = [25, 50, 75, 90];
+const firedScrollDepths = new Set();
+
+const handleScrollDepth = () => {
+  const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+  if (scrollableHeight <= 0) return;
+
+  const currentDepth = Math.min(100, Math.round((window.scrollY / scrollableHeight) * 100));
+  scrollDepthThresholds.forEach(depth => {
+    if (currentDepth >= depth && !firedScrollDepths.has(depth)) {
+      firedScrollDepths.add(depth);
+      pushDataLayerEvent('scroll_depth', {
+        scroll_depth: depth
+      });
+    }
+  });
+
+  if (firedScrollDepths.size === scrollDepthThresholds.length) {
+    window.removeEventListener('scroll', handleScrollDepth);
+  }
+};
+
+window.addEventListener('scroll', handleScrollDepth, { passive: true });
+handleScrollDepth();
 
 // Smooth scroll for navigation links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {

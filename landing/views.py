@@ -289,6 +289,7 @@ def home(request):
                         request.session[SUCCESS_STATE_SESSION_KEY] = {
                             "form_type": "reservation",
                             "payload": {
+                                "submission_id": submission.id,
                                 "session_type": reservation_form.cleaned_data["session_type"],
                                 "session_date": reservation_form.cleaned_data["session_date"],
                                 "measured_height": measured_height,
