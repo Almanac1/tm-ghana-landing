@@ -36,6 +36,26 @@ const setSessionStorageItem = (key, value) => {
   }
 };
 
+const observeElementOnce = (element, threshold, callback) => {
+  if (!element) return;
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries, observerInstance) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio >= threshold) {
+          callback();
+          observerInstance.disconnect();
+        }
+      });
+    }, { threshold: [threshold] });
+
+    observer.observe(element);
+    return;
+  }
+
+  callback();
+};
+
 // Mobile Menu Toggle
 const header = document.querySelector('.header');
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -580,6 +600,10 @@ if (reservationDateOptions) {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || target.type !== 'radio') return;
     reservationDateOptions.dataset.selectedDate = target.value;
+    pushDataLayerEvent('date_selection', {
+      selected_session_date: target.value,
+      selected_class_type: reservationSessionType?.value || reservationDateOptions.dataset.sessionMode || undefined
+    });
   });
 }
 
@@ -614,24 +638,11 @@ if (reservationFormCard && reservationLockShell) {
   setReservationLockedState(!leadComplete);
 }
 
-if (reservationFormCard && 'IntersectionObserver' in window) {
-  const reservationVisibilityObserver = new IntersectionObserver((entries, observerInstance) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-        pushDataLayerEvent('reserve_form_visible', {
-          section: 'reserve_form'
-        });
-        observerInstance.disconnect();
-      }
-    });
-  }, { threshold: [0.5] });
-
-  reservationVisibilityObserver.observe(reservationFormCard);
-} else if (reservationFormCard) {
+observeElementOnce(reservationFormCard, 0.5, () => {
   pushDataLayerEvent('reserve_form_visible', {
     section: 'reserve_form'
   });
-}
+});
 
 if (reservationFormCard) {
   const pushFormStartEvent = (event) => {
@@ -728,6 +739,33 @@ document.addEventListener('click', (event) => {
   });
 });
 
+document.addEventListener('click', (event) => {
+  const link = event.target instanceof Element
+    ? event.target.closest('a[href]')
+    : null;
+  if (!(link instanceof HTMLAnchorElement)) return;
+
+  const href = link.getAttribute('href') || '';
+  if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+  const linkUrl = new URL(href, window.location.href);
+  if (link.classList.contains('social-link')) {
+    pushDataLayerEvent('social_click', {
+      social_network: link.dataset.socialNetwork || link.getAttribute('aria-label')?.replace(/^Visit\s+/i, '').replace(/\s+profile$/i, '').toLowerCase() || undefined,
+      link_url: linkUrl.href
+    });
+    return;
+  }
+
+  const isOutbound = linkUrl.hostname && !/(^|\.)tmnigeria\.com$/i.test(linkUrl.hostname);
+  if (!isOutbound) return;
+
+  pushDataLayerEvent('outbound_click', {
+    link_url: linkUrl.href,
+    link_text: (link.textContent || '').replace(/\s+/g, ' ').trim() || link.getAttribute('aria-label') || undefined
+  });
+});
+
 const scrollDepthThresholds = [25, 50, 75, 90];
 const firedScrollDepths = new Set();
 
@@ -766,7 +804,15 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 });
 
 // FAQ Accordion Enhancement
+const faqSection = document.querySelector('.faq-section');
 const faqItems = document.querySelectorAll('.faq-item');
+
+observeElementOnce(faqSection, 0.5, () => {
+  pushDataLayerEvent('faq_section_view', {
+    section: 'faq'
+  });
+});
+
 faqItems.forEach(item => {
   const summary = item.querySelector('.faq-question');
   summary.addEventListener('click', () => {
@@ -777,7 +823,35 @@ faqItems.forEach(item => {
       }
     });
   });
+
+  item.addEventListener('toggle', () => {
+    if (!item.open) return;
+    const questionText = (summary?.textContent || '').replace(/\+/g, '').replace(/\s+/g, ' ').trim();
+    pushDataLayerEvent('faq_open', {
+      question_text: questionText
+    });
+  });
 });
+
+const instructorSection = document.querySelector('.instructor-section');
+const instructorName = instructorSection?.dataset.instructorName || undefined;
+
+observeElementOnce(instructorSection, 0.5, () => {
+  pushDataLayerEvent('bio_view', {
+    section: 'bio',
+    instructor_name: instructorName
+  });
+});
+
+if (instructorSection) {
+  instructorSection.addEventListener('click', (event) => {
+    if (event.target instanceof Element && event.target.closest('.social-link')) return;
+    pushDataLayerEvent('bio_click', {
+      instructor_name: instructorName,
+      section: 'bio'
+    });
+  });
+}
 
 // Testimonials Carousel Controls
 const testimonialsCarousel = document.getElementById('testimonialsCarousel');
