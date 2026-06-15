@@ -171,8 +171,8 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let lastFocusedElement = null;
   let activeFallbackUrl = 'https://www.youtube.com/watch?v=AL_c-sV9zXc';
   let activeVideoAnalytics = null;
-  let heroYouTubePlayer = null;
-  let heroVideoProgressTimer = null;
+  let activeYouTubePlayer = null;
+  let videoProgressTimer = null;
 
   if (heroVideoModal.parentElement !== document.body) {
     document.body.appendChild(heroVideoModal);
@@ -255,79 +255,92 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     heroVideoFallback.hidden = !isVisible;
   };
 
-  const resetHeroVideoAnalytics = () => {
-    if (heroVideoProgressTimer) {
-      window.clearInterval(heroVideoProgressTimer);
-      heroVideoProgressTimer = null;
+  const resetVideoAnalytics = () => {
+    if (videoProgressTimer) {
+      window.clearInterval(videoProgressTimer);
+      videoProgressTimer = null;
     }
 
     activeVideoAnalytics = null;
-    heroYouTubePlayer = null;
+    activeYouTubePlayer = null;
   };
 
-  const pushHeroVideoEvent = (eventName, params = {}) => {
-    if (!activeVideoAnalytics || activeVideoAnalytics.video_type !== 'hero') return;
+  const buildVideoAnalyticsParams = (params = {}) => {
+    if (!activeVideoAnalytics) return params;
 
-    pushDataLayerEvent(eventName, {
-      video_type: 'hero',
+    return {
+      video_type: activeVideoAnalytics.video_type,
+      testimonial_name: activeVideoAnalytics.testimonial_name || undefined,
       video_title: activeVideoAnalytics.video_title || undefined,
       ...params
-    });
+    };
   };
 
-  const pushHeroVideoComplete = () => {
+  const getVideoEventName = (action) => {
+    if (!activeVideoAnalytics?.video_type) return '';
+    return `${activeVideoAnalytics.video_type}_video_${action}`;
+  };
+
+  const pushVideoEvent = (action, params = {}) => {
+    const eventName = getVideoEventName(action);
+    if (!eventName) return;
+
+    pushDataLayerEvent(eventName, buildVideoAnalyticsParams(params));
+  };
+
+  const pushVideoComplete = () => {
     if (!activeVideoAnalytics || activeVideoAnalytics.completed) return;
     activeVideoAnalytics.completed = true;
-    pushHeroVideoEvent('hero_video_complete', {
+    pushVideoEvent('complete', {
       video_percent: 100
     });
   };
 
-  const trackHeroVideoProgress = () => {
-    if (!heroYouTubePlayer || !activeVideoAnalytics || activeVideoAnalytics.video_type !== 'hero') return;
+  const trackVideoProgress = () => {
+    if (!activeYouTubePlayer || !activeVideoAnalytics) return;
 
-    const duration = Number(heroYouTubePlayer.getDuration?.() || 0);
-    const currentTime = Number(heroYouTubePlayer.getCurrentTime?.() || 0);
+    const duration = Number(activeYouTubePlayer.getDuration?.() || 0);
+    const currentTime = Number(activeYouTubePlayer.getCurrentTime?.() || 0);
     if (!duration || !currentTime) return;
 
     const watchedPercent = Math.floor((currentTime / duration) * 100);
     [25, 50, 75].forEach(percent => {
       if (watchedPercent >= percent && !activeVideoAnalytics.progressFired.has(percent)) {
         activeVideoAnalytics.progressFired.add(percent);
-        pushHeroVideoEvent('hero_video_progress', {
+        pushVideoEvent('progress', {
           video_percent: percent
         });
       }
     });
 
     if (watchedPercent >= 90) {
-      pushHeroVideoComplete();
+      pushVideoComplete();
     }
   };
 
-  const initializeHeroVideoPlayer = () => {
-    if (!activeVideoAnalytics || activeVideoAnalytics.video_type !== 'hero') return;
+  const initializeVideoPlayer = () => {
+    if (!activeVideoAnalytics) return;
 
     loadYouTubeIframeApi().then(YT => {
-      if (!activeVideoAnalytics || activeVideoAnalytics.video_type !== 'hero' || !heroVideoFrame.src) return;
+      if (!activeVideoAnalytics || !heroVideoFrame.src) return;
 
-      heroYouTubePlayer = new YT.Player(heroVideoFrame, {
+      activeYouTubePlayer = new YT.Player(heroVideoFrame, {
         events: {
           onStateChange: event => {
             if (event.data === YT.PlayerState.PLAYING) {
               if (!activeVideoAnalytics.started) {
                 activeVideoAnalytics.started = true;
-                pushHeroVideoEvent('hero_video_start');
+                pushVideoEvent('start');
               }
 
-              if (!heroVideoProgressTimer) {
-                heroVideoProgressTimer = window.setInterval(trackHeroVideoProgress, 1000);
+              if (!videoProgressTimer) {
+                videoProgressTimer = window.setInterval(trackVideoProgress, 1000);
               }
             }
 
             if (event.data === YT.PlayerState.ENDED) {
-              trackHeroVideoProgress();
-              pushHeroVideoComplete();
+              trackVideoProgress();
+              pushVideoComplete();
             }
           }
         }
@@ -341,7 +354,7 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     document.body.classList.toggle('hero-video-open', isOpen);
 
     if (isOpen) {
-      resetHeroVideoAnalytics();
+      resetVideoAnalytics();
       const embedUrl = buildYouTubeEmbedUrl(videoUrl);
       const fallbackUrl = buildYouTubeWatchUrl(embedUrl);
       activeFallbackUrl = fallbackUrl;
@@ -355,13 +368,13 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
             progressFired: new Set()
           }
         : null;
-      pushHeroVideoEvent('hero_video_open', {
-        section: 'hero'
+      pushVideoEvent('open', {
+        section: activeVideoAnalytics?.section || undefined
       });
-      initializeHeroVideoPlayer();
+      initializeVideoPlayer();
       window.setTimeout(() => closeHeroVideoBtn.focus(), 0);
     } else {
-      resetHeroVideoAnalytics();
+      resetVideoAnalytics();
       heroVideoFrame.src = '';
       setVideoFallbackState(false);
       lastFocusedElement?.focus?.();
@@ -377,7 +390,8 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     lastFocusedElement = document.activeElement;
     setHeroVideoOpenState(true, watchVideoBtn.dataset.videoUrl || heroVideoUrl, {
       video_type: 'hero',
-      video_title: heroVideoFrame.title || watchVideoBtn.textContent?.trim() || undefined
+      video_title: heroVideoFrame.title || watchVideoBtn.textContent?.trim() || undefined,
+      section: 'hero'
     });
   });
 
@@ -385,7 +399,12 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     const openTestimonialVideo = () => {
       lastFocusedElement = document.activeElement;
       const videoUrl = card.dataset.videoUrl || heroVideoUrl;
-      setHeroVideoOpenState(true, videoUrl);
+      setHeroVideoOpenState(true, videoUrl, {
+        video_type: 'testimonial',
+        testimonial_name: card.dataset.testimonialName || card.querySelector('img')?.alt || undefined,
+        video_title: card.dataset.videoTitle || card.getAttribute('aria-label') || undefined,
+        section: 'testimonials'
+      });
     };
 
     card.addEventListener('click', (event) => {
