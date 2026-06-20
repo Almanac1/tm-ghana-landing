@@ -1,3 +1,61 @@
+window.dataLayer = window.dataLayer || [];
+
+function pushDataLayerEvent(eventName, params = {}) {
+  window.dataLayer.push({
+    event: eventName,
+    ...params
+  });
+}
+
+const getSectionName = (element) => {
+  const section = element?.closest?.('section');
+  if (section?.id) return section.id;
+  if (element?.closest?.('.header')) return 'navigation';
+  if (element?.closest?.('.footer')) return 'footer';
+  return 'unknown';
+};
+
+const getReservationAnalyticsState = () => ({
+  selected_class_type: document.getElementById('reservation-session-type')?.value || undefined,
+  selected_session_date: document.getElementById('reservationDateOptions')?.dataset.selectedDate || undefined
+});
+
+const getSessionStorageItem = (key) => {
+  try {
+    return window.sessionStorage?.getItem(key);
+  } catch (error) {
+    return null;
+  }
+};
+
+const setSessionStorageItem = (key, value) => {
+  try {
+    window.sessionStorage?.setItem(key, value);
+  } catch (error) {
+    // Analytics dedupe should never block the site if storage is unavailable.
+  }
+};
+
+const observeElementOnce = (element, threshold, callback) => {
+  if (!element) return;
+
+  if ('IntersectionObserver' in window) {
+    const observer = new IntersectionObserver((entries, observerInstance) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio >= threshold) {
+          callback();
+          observerInstance.disconnect();
+        }
+      });
+    }, { threshold: [threshold] });
+
+    observer.observe(element);
+    return;
+  }
+
+  callback();
+};
+
 // Mobile Menu Toggle
 const header = document.querySelector('.header');
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -132,10 +190,59 @@ const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc';
 if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let lastFocusedElement = null;
   let activeFallbackUrl = 'https://www.youtube.com/watch?v=AL_c-sV9zXc';
+  let activeVideoAnalytics = null;
+  let activeYouTubePlayer = null;
+  let videoProgressTimer = null;
+  let videoPlayerSession = 0;
 
   if (heroVideoModal.parentElement !== document.body) {
     document.body.appendChild(heroVideoModal);
   }
+
+  const loadYouTubeIframeApi = () => {
+    if (window.YT?.Player) {
+      return Promise.resolve(window.YT);
+    }
+
+    if (window.tmYouTubeIframeApiPromise) {
+      return window.tmYouTubeIframeApiPromise;
+    }
+
+    window.tmYouTubeIframeApiPromise = new Promise((resolve, reject) => {
+      const previousCallback = window.onYouTubeIframeAPIReady;
+      const timeoutId = window.setTimeout(() => {
+        reject(new Error('YouTube IFrame API timed out'));
+      }, 10000);
+
+      window.onYouTubeIframeAPIReady = () => {
+        window.clearTimeout(timeoutId);
+        try {
+          previousCallback?.();
+        } finally {
+          resolve(window.YT);
+        }
+      };
+
+      const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        script.addEventListener('error', () => {
+          window.clearTimeout(timeoutId);
+          reject(new Error('YouTube IFrame API failed to load'));
+        }, { once: true });
+        document.head.appendChild(script);
+      } else {
+        existingScript.addEventListener('error', () => {
+          window.clearTimeout(timeoutId);
+          reject(new Error('YouTube IFrame API failed to load'));
+        }, { once: true });
+      }
+    });
+
+    return window.tmYouTubeIframeApiPromise;
+  };
 
   const getYouTubeVideoId = (videoUrl) => {
     try {
@@ -157,6 +264,7 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     const params = new URLSearchParams({
       autoplay: '1',
       rel: '0',
+      enablejsapi: '1',
       modestbranding: '1',
       playsinline: '1',
       origin: window.location.origin,
@@ -186,19 +294,200 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     heroVideoFallback.hidden = !isVisible;
   };
 
-  const setHeroVideoOpenState = (isOpen, videoUrl = heroVideoUrl) => {
+  const resetVideoAnalytics = () => {
+    videoPlayerSession += 1;
+
+    if (videoProgressTimer) {
+      window.clearInterval(videoProgressTimer);
+      videoProgressTimer = null;
+    }
+
+    activeVideoAnalytics = null;
+    activeYouTubePlayer = null;
+  };
+
+  const getVideoPlaybackParams = () => {
+    if (!activeYouTubePlayer) return {};
+
+    const duration = Number(activeYouTubePlayer.getDuration?.() || 0);
+    const currentTime = Number(activeYouTubePlayer.getCurrentTime?.() || 0);
+    const watchedSeconds = Number(activeVideoAnalytics?.watchedSeconds || 0);
+
+    return {
+      video_duration: duration ? Math.round(duration) : undefined,
+      video_current_time: currentTime ? Math.round(currentTime) : 0,
+      video_watched_seconds: Math.round(watchedSeconds),
+      video_percent: duration
+        ? Math.min(100, Math.floor((currentTime / duration) * 100))
+        : undefined,
+      video_watch_percent: duration
+        ? Math.min(100, Math.floor((watchedSeconds / duration) * 100))
+        : undefined
+    };
+  };
+
+  const buildVideoAnalyticsParams = (params = {}) => {
+    if (!activeVideoAnalytics) return params;
+
+    return {
+      video_provider: 'youtube',
+      video_id: activeVideoAnalytics.video_id,
+      video_url: activeVideoAnalytics.video_url,
+      video_type: activeVideoAnalytics.video_type,
+      testimonial_name: activeVideoAnalytics.testimonial_name || undefined,
+      video_title: activeVideoAnalytics.video_title || undefined,
+      ...getVideoPlaybackParams(),
+      ...params
+    };
+  };
+
+  const getVideoEventName = (action) => {
+    if (!activeVideoAnalytics?.video_type) return '';
+    return `${activeVideoAnalytics.video_type}_video_${action}`;
+  };
+
+  const pushVideoEvent = (action, params = {}) => {
+    const eventName = getVideoEventName(action);
+    if (!eventName) return;
+
+    pushDataLayerEvent(eventName, buildVideoAnalyticsParams(params));
+  };
+
+  const pushVideoComplete = () => {
+    if (!activeVideoAnalytics || activeVideoAnalytics.completed) return;
+    activeVideoAnalytics.completed = true;
+    pushVideoEvent('complete', {
+      video_percent: 100
+    });
+  };
+
+  const trackVideoProgress = () => {
+    if (!activeYouTubePlayer || !activeVideoAnalytics) return;
+
+    const duration = Number(activeYouTubePlayer.getDuration?.() || 0);
+    if (!duration) return;
+
+    const now = performance.now();
+    if (activeVideoAnalytics.isPlaying && activeVideoAnalytics.lastProgressTimestamp) {
+      const elapsedSeconds = Math.min(
+        2,
+        Math.max(0, (now - activeVideoAnalytics.lastProgressTimestamp) / 1000)
+      );
+      activeVideoAnalytics.watchedSeconds = Math.min(
+        duration,
+        activeVideoAnalytics.watchedSeconds + elapsedSeconds
+      );
+    }
+    activeVideoAnalytics.lastProgressTimestamp = now;
+
+    const watchedPercent = Math.floor((activeVideoAnalytics.watchedSeconds / duration) * 100);
+    [25, 50, 75, 90].forEach(percent => {
+      if (watchedPercent >= percent && !activeVideoAnalytics.progressFired.has(percent)) {
+        activeVideoAnalytics.progressFired.add(percent);
+        pushVideoEvent('progress', {
+          video_percent: percent
+        });
+      }
+    });
+  };
+
+  const initializeVideoPlayer = () => {
+    if (!activeVideoAnalytics) return;
+    const playerSession = videoPlayerSession;
+
+    loadYouTubeIframeApi().then(YT => {
+      if (
+        playerSession !== videoPlayerSession ||
+        !activeVideoAnalytics ||
+        !heroVideoFrame.src
+      ) return;
+
+      activeYouTubePlayer = new YT.Player(heroVideoFrame, {
+        events: {
+          onStateChange: event => {
+            if (event.data === YT.PlayerState.PLAYING) {
+              if (!activeVideoAnalytics.isPlaying) {
+                activeVideoAnalytics.isPlaying = true;
+                activeVideoAnalytics.lastProgressTimestamp = performance.now();
+              }
+
+              if (!activeVideoAnalytics.started) {
+                activeVideoAnalytics.started = true;
+                pushVideoEvent('start');
+              }
+
+              if (!videoProgressTimer) {
+                videoProgressTimer = window.setInterval(trackVideoProgress, 1000);
+              }
+            }
+
+            if (event.data === YT.PlayerState.PAUSED && activeVideoAnalytics.started) {
+              trackVideoProgress();
+              activeVideoAnalytics.isPlaying = false;
+              pushVideoEvent('pause');
+            }
+
+            if (event.data === YT.PlayerState.BUFFERING) {
+              trackVideoProgress();
+              activeVideoAnalytics.isPlaying = false;
+            }
+
+            if (event.data === YT.PlayerState.ENDED) {
+              trackVideoProgress();
+              activeVideoAnalytics.isPlaying = false;
+              pushVideoComplete();
+            }
+          },
+          onError: event => {
+            pushVideoEvent('error', {
+              video_error_code: event.data
+            });
+            setVideoFallbackState(true, activeFallbackUrl);
+          }
+        }
+      });
+    }).catch(error => {
+      if (playerSession !== videoPlayerSession || !activeVideoAnalytics) return;
+      pushVideoEvent('error', {
+        video_error_message: error.message
+      });
+      setVideoFallbackState(true, activeFallbackUrl);
+    });
+  };
+
+  const setHeroVideoOpenState = (isOpen, videoUrl = heroVideoUrl, analytics = null) => {
     heroVideoModal.classList.toggle('is-open', isOpen);
     heroVideoModal.setAttribute('aria-hidden', String(!isOpen));
     document.body.classList.toggle('hero-video-open', isOpen);
 
     if (isOpen) {
+      resetVideoAnalytics();
       const embedUrl = buildYouTubeEmbedUrl(videoUrl);
       const fallbackUrl = buildYouTubeWatchUrl(embedUrl);
+      const videoId = getYouTubeVideoId(embedUrl);
       activeFallbackUrl = fallbackUrl;
       setVideoFallbackState(false, fallbackUrl);
       heroVideoFrame.src = embedUrl;
+      activeVideoAnalytics = analytics
+        ? {
+            ...analytics,
+            video_id: videoId,
+            video_url: fallbackUrl,
+            started: false,
+            completed: false,
+            progressFired: new Set(),
+            watchedSeconds: 0,
+            lastProgressTimestamp: null,
+            isPlaying: false
+          }
+        : null;
+      pushVideoEvent('open', {
+        section: activeVideoAnalytics?.section || undefined
+      });
+      initializeVideoPlayer();
       window.setTimeout(() => closeHeroVideoBtn.focus(), 0);
     } else {
+      resetVideoAnalytics();
       heroVideoFrame.src = '';
       setVideoFallbackState(false);
       lastFocusedElement?.focus?.();
@@ -212,14 +501,23 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   watchVideoBtn.addEventListener('click', (event) => {
     event.preventDefault();
     lastFocusedElement = document.activeElement;
-    setHeroVideoOpenState(true, watchVideoBtn.dataset.videoUrl || heroVideoUrl);
+    setHeroVideoOpenState(true, watchVideoBtn.dataset.videoUrl || heroVideoUrl, {
+      video_type: 'hero',
+      video_title: heroVideoFrame.title || watchVideoBtn.textContent?.trim() || undefined,
+      section: 'hero'
+    });
   });
 
   document.querySelectorAll('.testimonial-card[data-video-url]').forEach(card => {
     const openTestimonialVideo = () => {
       lastFocusedElement = document.activeElement;
       const videoUrl = card.dataset.videoUrl || heroVideoUrl;
-      setHeroVideoOpenState(true, videoUrl);
+      setHeroVideoOpenState(true, videoUrl, {
+        video_type: 'testimonial',
+        testimonial_name: card.dataset.testimonialName || card.querySelector('img')?.alt || undefined,
+        video_title: card.dataset.videoTitle || card.getAttribute('aria-label') || undefined,
+        section: 'testimonials'
+      });
     };
 
     card.addEventListener('click', (event) => {
@@ -263,6 +561,7 @@ const reservationSessionControl = document.getElementById('reservationSessionCon
 const reservationDateOptions = document.getElementById('reservationDateOptions');
 const reservationSubmitBtn = document.getElementById('reservationSubmitBtn');
 const reservationUnlockNote = document.getElementById('reservationUnlockNote');
+let reservationFormStarted = false;
 const reservationDateOptionsByMode = {
   physical: [
     { value: '2026-07-04', label: 'Saturday, July 4' },
@@ -394,6 +693,10 @@ if (reservationDateOptions) {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || target.type !== 'radio') return;
     reservationDateOptions.dataset.selectedDate = target.value;
+    pushDataLayerEvent('date_selection', {
+      selected_session_date: target.value,
+      selected_class_type: reservationSessionType?.value || reservationDateOptions.dataset.sessionMode || undefined
+    });
   });
 }
 
@@ -426,6 +729,52 @@ if (reservationSessionType && reservationToggleInputs.length) {
 if (reservationFormCard && reservationLockShell) {
   const leadComplete = reservationFormCard.dataset.leadComplete === 'true';
   setReservationLockedState(!leadComplete);
+}
+
+observeElementOnce(reservationFormCard, 0.5, () => {
+  pushDataLayerEvent('reserve_form_visible', {
+    section: 'reserve_form'
+  });
+});
+
+if (reservationFormCard) {
+  const pushFormStartEvent = (event) => {
+    if (reservationFormStarted) return;
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement || target instanceof HTMLButtonElement)) {
+      return;
+    }
+    if (target.disabled || target.type === 'hidden' || target.type === 'submit') {
+      return;
+    }
+
+    reservationFormStarted = true;
+    pushDataLayerEvent('form_start', {
+      form_name: 'reserve_your_spot',
+      ...getReservationAnalyticsState()
+    });
+  };
+
+  reservationFormCard.addEventListener('focusin', pushFormStartEvent);
+  reservationFormCard.addEventListener('change', pushFormStartEvent);
+  reservationFormCard.addEventListener('input', pushFormStartEvent);
+}
+
+if (reservationFormCard?.dataset.analyticsSuccess === 'true') {
+  const submissionId = reservationFormCard.dataset.analyticsSubmissionId || [
+    reservationFormCard.dataset.analyticsSessionType,
+    reservationFormCard.dataset.analyticsSessionDate
+  ].filter(Boolean).join(':');
+  const storageKey = `tmnigeria_form_submit_${submissionId}`;
+
+  if (submissionId && getSessionStorageItem(storageKey) !== 'true') {
+    pushDataLayerEvent('form_submit', {
+      form_name: 'reserve_your_spot',
+      selected_class_type: reservationFormCard.dataset.analyticsSessionType || undefined,
+      selected_session_date: reservationFormCard.dataset.analyticsSessionDate || undefined
+    });
+    setSessionStorageItem(storageKey, 'true');
+  }
 }
 
 if (reservationFormCard && reservationMeasuredHeight) {
@@ -463,6 +812,78 @@ if (leadCountry && leadPhone && phonePrefix) {
   syncPhonePrefix();
 }
 
+document.addEventListener('click', (event) => {
+  const cta = event.target instanceof Element
+    ? event.target.closest('a, button')
+    : null;
+  if (!cta) return;
+
+  const buttonText = (cta.textContent || '').replace(/\s+/g, ' ').trim();
+  if (!/(reserve|learn tm|free intro|book)/i.test(buttonText)) return;
+
+  const destination = cta instanceof HTMLAnchorElement
+    ? cta.getAttribute('href') || ''
+    : cta.dataset.videoUrl || cta.getAttribute('formaction') || cta.closest('form')?.getAttribute('action') || window.location.pathname;
+
+  pushDataLayerEvent('reserve_cta_click', {
+    button_text: buttonText,
+    section: getSectionName(cta),
+    destination
+  });
+});
+
+document.addEventListener('click', (event) => {
+  const link = event.target instanceof Element
+    ? event.target.closest('a[href]')
+    : null;
+  if (!(link instanceof HTMLAnchorElement)) return;
+
+  const href = link.getAttribute('href') || '';
+  if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+
+  const linkUrl = new URL(href, window.location.href);
+  if (link.classList.contains('social-link')) {
+    pushDataLayerEvent('social_click', {
+      social_network: link.dataset.socialNetwork || link.getAttribute('aria-label')?.replace(/^Visit\s+/i, '').replace(/\s+profile$/i, '').toLowerCase() || undefined,
+      link_url: linkUrl.href
+    });
+    return;
+  }
+
+  const isOutbound = linkUrl.hostname && !/(^|\.)tmnigeria\.com$/i.test(linkUrl.hostname);
+  if (!isOutbound) return;
+
+  pushDataLayerEvent('outbound_click', {
+    link_url: linkUrl.href,
+    link_text: (link.textContent || '').replace(/\s+/g, ' ').trim() || link.getAttribute('aria-label') || undefined
+  });
+});
+
+const scrollDepthThresholds = [25, 50, 75, 90];
+const firedScrollDepths = new Set();
+
+const handleScrollDepth = () => {
+  const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+  if (scrollableHeight <= 0) return;
+
+  const currentDepth = Math.min(100, Math.round((window.scrollY / scrollableHeight) * 100));
+  scrollDepthThresholds.forEach(depth => {
+    if (currentDepth >= depth && !firedScrollDepths.has(depth)) {
+      firedScrollDepths.add(depth);
+      pushDataLayerEvent('scroll_depth', {
+        scroll_depth: depth
+      });
+    }
+  });
+
+  if (firedScrollDepths.size === scrollDepthThresholds.length) {
+    window.removeEventListener('scroll', handleScrollDepth);
+  }
+};
+
+window.addEventListener('scroll', handleScrollDepth, { passive: true });
+handleScrollDepth();
+
 // Smooth scroll for navigation links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   anchor.addEventListener('click', function (e) {
@@ -476,7 +897,15 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 });
 
 // FAQ Accordion Enhancement
+const faqSection = document.querySelector('.faq-section');
 const faqItems = document.querySelectorAll('.faq-item');
+
+observeElementOnce(faqSection, 0.5, () => {
+  pushDataLayerEvent('faq_section_view', {
+    section: 'faq'
+  });
+});
+
 faqItems.forEach(item => {
   const summary = item.querySelector('.faq-question');
   summary.addEventListener('click', () => {
@@ -487,7 +916,35 @@ faqItems.forEach(item => {
       }
     });
   });
+
+  item.addEventListener('toggle', () => {
+    if (!item.open) return;
+    const questionText = (summary?.textContent || '').replace(/\+/g, '').replace(/\s+/g, ' ').trim();
+    pushDataLayerEvent('faq_open', {
+      question_text: questionText
+    });
+  });
 });
+
+const instructorSection = document.querySelector('.instructor-section');
+const instructorName = instructorSection?.dataset.instructorName || undefined;
+
+observeElementOnce(instructorSection, 0.5, () => {
+  pushDataLayerEvent('bio_view', {
+    section: 'bio',
+    instructor_name: instructorName
+  });
+});
+
+if (instructorSection) {
+  instructorSection.addEventListener('click', (event) => {
+    if (event.target instanceof Element && event.target.closest('.social-link')) return;
+    pushDataLayerEvent('bio_click', {
+      instructor_name: instructorName,
+      section: 'bio'
+    });
+  });
+}
 
 // Testimonials Carousel Controls
 const testimonialsCarousel = document.getElementById('testimonialsCarousel');

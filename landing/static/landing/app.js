@@ -193,6 +193,7 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let activeVideoAnalytics = null;
   let activeYouTubePlayer = null;
   let videoProgressTimer = null;
+  let videoPlayerSession = 0;
 
   if (heroVideoModal.parentElement !== document.body) {
     document.body.appendChild(heroVideoModal);
@@ -207,18 +208,36 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
       return window.tmYouTubeIframeApiPromise;
     }
 
-    window.tmYouTubeIframeApiPromise = new Promise(resolve => {
+    window.tmYouTubeIframeApiPromise = new Promise((resolve, reject) => {
       const previousCallback = window.onYouTubeIframeAPIReady;
+      const timeoutId = window.setTimeout(() => {
+        reject(new Error('YouTube IFrame API timed out'));
+      }, 10000);
+
       window.onYouTubeIframeAPIReady = () => {
-        previousCallback?.();
-        resolve(window.YT);
+        window.clearTimeout(timeoutId);
+        try {
+          previousCallback?.();
+        } finally {
+          resolve(window.YT);
+        }
       };
 
-      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      if (!existingScript) {
         const script = document.createElement('script');
         script.src = 'https://www.youtube.com/iframe_api';
         script.async = true;
+        script.addEventListener('error', () => {
+          window.clearTimeout(timeoutId);
+          reject(new Error('YouTube IFrame API failed to load'));
+        }, { once: true });
         document.head.appendChild(script);
+      } else {
+        existingScript.addEventListener('error', () => {
+          window.clearTimeout(timeoutId);
+          reject(new Error('YouTube IFrame API failed to load'));
+        }, { once: true });
       }
     });
 
@@ -276,6 +295,8 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   };
 
   const resetVideoAnalytics = () => {
+    videoPlayerSession += 1;
+
     if (videoProgressTimer) {
       window.clearInterval(videoProgressTimer);
       videoProgressTimer = null;
@@ -285,13 +306,37 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     activeYouTubePlayer = null;
   };
 
+  const getVideoPlaybackParams = () => {
+    if (!activeYouTubePlayer) return {};
+
+    const duration = Number(activeYouTubePlayer.getDuration?.() || 0);
+    const currentTime = Number(activeYouTubePlayer.getCurrentTime?.() || 0);
+    const watchedSeconds = Number(activeVideoAnalytics?.watchedSeconds || 0);
+
+    return {
+      video_duration: duration ? Math.round(duration) : undefined,
+      video_current_time: currentTime ? Math.round(currentTime) : 0,
+      video_watched_seconds: Math.round(watchedSeconds),
+      video_percent: duration
+        ? Math.min(100, Math.floor((currentTime / duration) * 100))
+        : undefined,
+      video_watch_percent: duration
+        ? Math.min(100, Math.floor((watchedSeconds / duration) * 100))
+        : undefined
+    };
+  };
+
   const buildVideoAnalyticsParams = (params = {}) => {
     if (!activeVideoAnalytics) return params;
 
     return {
+      video_provider: 'youtube',
+      video_id: activeVideoAnalytics.video_id,
+      video_url: activeVideoAnalytics.video_url,
       video_type: activeVideoAnalytics.video_type,
       testimonial_name: activeVideoAnalytics.testimonial_name || undefined,
       video_title: activeVideoAnalytics.video_title || undefined,
+      ...getVideoPlaybackParams(),
       ...params
     };
   };
@@ -320,11 +365,23 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     if (!activeYouTubePlayer || !activeVideoAnalytics) return;
 
     const duration = Number(activeYouTubePlayer.getDuration?.() || 0);
-    const currentTime = Number(activeYouTubePlayer.getCurrentTime?.() || 0);
-    if (!duration || !currentTime) return;
+    if (!duration) return;
 
-    const watchedPercent = Math.floor((currentTime / duration) * 100);
-    [25, 50, 75].forEach(percent => {
+    const now = performance.now();
+    if (activeVideoAnalytics.isPlaying && activeVideoAnalytics.lastProgressTimestamp) {
+      const elapsedSeconds = Math.min(
+        2,
+        Math.max(0, (now - activeVideoAnalytics.lastProgressTimestamp) / 1000)
+      );
+      activeVideoAnalytics.watchedSeconds = Math.min(
+        duration,
+        activeVideoAnalytics.watchedSeconds + elapsedSeconds
+      );
+    }
+    activeVideoAnalytics.lastProgressTimestamp = now;
+
+    const watchedPercent = Math.floor((activeVideoAnalytics.watchedSeconds / duration) * 100);
+    [25, 50, 75, 90].forEach(percent => {
       if (watchedPercent >= percent && !activeVideoAnalytics.progressFired.has(percent)) {
         activeVideoAnalytics.progressFired.add(percent);
         pushVideoEvent('progress', {
@@ -332,22 +389,28 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
         });
       }
     });
-
-    if (watchedPercent >= 90) {
-      pushVideoComplete();
-    }
   };
 
   const initializeVideoPlayer = () => {
     if (!activeVideoAnalytics) return;
+    const playerSession = videoPlayerSession;
 
     loadYouTubeIframeApi().then(YT => {
-      if (!activeVideoAnalytics || !heroVideoFrame.src) return;
+      if (
+        playerSession !== videoPlayerSession ||
+        !activeVideoAnalytics ||
+        !heroVideoFrame.src
+      ) return;
 
       activeYouTubePlayer = new YT.Player(heroVideoFrame, {
         events: {
           onStateChange: event => {
             if (event.data === YT.PlayerState.PLAYING) {
+              if (!activeVideoAnalytics.isPlaying) {
+                activeVideoAnalytics.isPlaying = true;
+                activeVideoAnalytics.lastProgressTimestamp = performance.now();
+              }
+
               if (!activeVideoAnalytics.started) {
                 activeVideoAnalytics.started = true;
                 pushVideoEvent('start');
@@ -358,13 +421,37 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
               }
             }
 
+            if (event.data === YT.PlayerState.PAUSED && activeVideoAnalytics.started) {
+              trackVideoProgress();
+              activeVideoAnalytics.isPlaying = false;
+              pushVideoEvent('pause');
+            }
+
+            if (event.data === YT.PlayerState.BUFFERING) {
+              trackVideoProgress();
+              activeVideoAnalytics.isPlaying = false;
+            }
+
             if (event.data === YT.PlayerState.ENDED) {
               trackVideoProgress();
+              activeVideoAnalytics.isPlaying = false;
               pushVideoComplete();
             }
+          },
+          onError: event => {
+            pushVideoEvent('error', {
+              video_error_code: event.data
+            });
+            setVideoFallbackState(true, activeFallbackUrl);
           }
         }
       });
+    }).catch(error => {
+      if (playerSession !== videoPlayerSession || !activeVideoAnalytics) return;
+      pushVideoEvent('error', {
+        video_error_message: error.message
+      });
+      setVideoFallbackState(true, activeFallbackUrl);
     });
   };
 
@@ -377,15 +464,21 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
       resetVideoAnalytics();
       const embedUrl = buildYouTubeEmbedUrl(videoUrl);
       const fallbackUrl = buildYouTubeWatchUrl(embedUrl);
+      const videoId = getYouTubeVideoId(embedUrl);
       activeFallbackUrl = fallbackUrl;
       setVideoFallbackState(false, fallbackUrl);
       heroVideoFrame.src = embedUrl;
       activeVideoAnalytics = analytics
         ? {
             ...analytics,
+            video_id: videoId,
+            video_url: fallbackUrl,
             started: false,
             completed: false,
-            progressFired: new Set()
+            progressFired: new Set(),
+            watchedSeconds: 0,
+            lastProgressTimestamp: null,
+            isPlaying: false
           }
         : null;
       pushVideoEvent('open', {
