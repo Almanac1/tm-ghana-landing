@@ -185,7 +185,7 @@ const heroVideoModal = document.getElementById('heroVideoModal');
 const closeHeroVideoBtn = document.getElementById('closeHeroVideo');
 const heroVideoFrame = document.getElementById('heroVideoFrame');
 const heroVideoFallback = document.getElementById('heroVideoFallback');
-const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc';
+const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc?enablejsapi=1';
 
 if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let lastFocusedElement = null;
@@ -280,6 +280,7 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
       // Fall back to the required YouTube embed format below.
     }
 
+    params.set('enablejsapi', '1');
     return `https://www.youtube.com/embed/${videoId || 'AL_c-sV9zXc'}?${params.toString()}`;
   };
 
