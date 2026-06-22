@@ -12,10 +12,13 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
+
 from decouple import config as env_config
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -146,20 +149,14 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Email configuration (env-driven)
-EMAIL_BACKEND = env_config(
-    "EMAIL_BACKEND",
-    default=env_config("DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend"),
-)
-EMAIL_HOST = env_config("EMAIL_HOST", default=env_config("DJANGO_EMAIL_HOST", default="smtp.gmail.com"))
-EMAIL_PORT = env_config("EMAIL_PORT", default=env_config("DJANGO_EMAIL_PORT", default="587"), cast=int)
-EMAIL_HOST_USER = env_config("EMAIL_HOST_USER", default=env_config("DJANGO_EMAIL_HOST_USER", default=""))
-EMAIL_HOST_PASSWORD = env_config("EMAIL_HOST_PASSWORD", default=env_config("DJANGO_EMAIL_HOST_PASSWORD", default=""))
-EMAIL_USE_TLS = env_config("EMAIL_USE_TLS", default=env_config("DJANGO_EMAIL_USE_TLS", default="True"), cast=bool)
-EMAIL_USE_SSL = env_config("EMAIL_USE_SSL", default=env_config("DJANGO_EMAIL_USE_SSL", default="False"), cast=bool)
-DEFAULT_FROM_EMAIL = env_config(
-    "DEFAULT_FROM_EMAIL",
-    default=env_config("DJANGO_DEFAULT_FROM_EMAIL", default=EMAIL_HOST_USER or "no-reply@example.com"),
-)
+# Namecheap Private Email SMTP
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "mail.privateemail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 SERVER_EMAIL = env_config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
 LANDING_ADMIN_EMAIL = env_config("LANDING_ADMIN_EMAIL", default=DEFAULT_FROM_EMAIL)
