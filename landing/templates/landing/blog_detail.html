@@ -1,0 +1,49 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ article.title }} - Transcendental Meditation Nigeria</title>
+  <link rel="stylesheet" href="{% static 'landing/styles.css' %}">
+</head>
+<body>
+  <header class="header navbar-highlighted is-scrolled">
+    <div class="container header-container">
+      <div class="logo">
+        <a href="{% url 'home' %}">
+          <img src="{% static 'landing/images/logo_midnight.svg' %}" alt="Transcendental Meditation" class="logo-image">
+        </a>
+      </div>
+      <nav class="nav-menu">
+        <a href="{% url 'home' %}#home" class="nav-link">Home</a>
+        <a href="{% url 'home' %}#booking" class="nav-link">Book a Date</a>
+        <a href="{% url 'home' %}#testimonials" class="nav-link">Testimonials</a>
+        <a href="{% url 'blog_list' %}" class="nav-link">Blogs</a>
+        <a href="{% url 'home' %}#contact" class="nav-link">Contact Us</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="blog-page">
+    <article>
+      <header class="blog-detail-header">
+        <p class="blog-detail-date">{{ article.created_at|date:"F j, Y" }}</p>
+        <h1 class="blog-detail-title">{{ article.title }}</h1>
+      </header>
+      <div class="blog-detail-body">
+        {{ article.body|linebreaks }}
+      </div>
+      <div class="blog-page-actions">
+        <a class="blog-back-link" href="{% url 'blog_list' %}">Back to articles</a>
+      </div>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2025 Transcendental Meditation (Nigeria)</p>
+    </div>
+  </footer>
+</body>
+</html>

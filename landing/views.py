@@ -3,13 +3,13 @@ from typing import Optional
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from .forms import LeadCaptureForm, ReservationForm
-from .models import Reservation, Submission
+from .forms import FALLBACK_CLASS_DATES, LeadCaptureForm, ReservationForm, get_active_class_date_options
+from .models import BlogArticle, HomePageContent, Reservation, Submission
 
 
 BENEFITS = [
@@ -48,20 +48,12 @@ LEAD_DETAILS_SESSION_KEY = "landing_lead_details_completed"
 logger = logging.getLogger(__name__)
 
 
-SESSION_DATE_LABELS = {
-    Reservation.SessionType.PHYSICAL: {
-        Reservation.SessionDate.JUL4_2026: "Saturday, July 4, 2026",
-        Reservation.SessionDate.JUL11_2026: "Saturday, July 11, 2026",
-        Reservation.SessionDate.JUL18_2026: "Saturday, July 18, 2026",
-        Reservation.SessionDate.JUL25_2026: "Saturday, July 25, 2026",
-    },
-    Reservation.SessionType.ONLINE: {
-        Reservation.SessionDate.JUL1_2026: "Wednesday, July 1, 2026",
-        Reservation.SessionDate.JUL8_2026: "Wednesday, July 8, 2026",
-        Reservation.SessionDate.JUL15_2026: "Wednesday, July 15, 2026",
-        Reservation.SessionDate.JUL22_2026: "Wednesday, July 22, 2026",
-        Reservation.SessionDate.JUL29_2026: "Wednesday, July 29, 2026",
-    },
+DEFAULT_HOMEPAGE_CONTENT = {
+    "hero_headline": "Think Clearly.\nFeel Balance.\nWork Better.",
+    "hero_subtitle": "A simple, effortless technique to reduce stress, sharpen focus, and support better living.",
+    "cta_button_text": "Watch Video",
+    "cta_button_link": "",
+    "hero_youtube_url": "https://www.youtube.com/embed/AL_c-sV9zXc?enablejsapi=1",
 }
 
 
@@ -95,14 +87,56 @@ def _first_form_error(form) -> Optional[str]:
     return None
 
 
+def _get_homepage_content() -> dict:
+    content = HomePageContent.objects.filter(is_active=True).order_by("-updated_at").first()
+    if not content:
+        content_data = DEFAULT_HOMEPAGE_CONTENT.copy()
+    else:
+        content_data = {
+            "hero_headline": content.hero_headline or DEFAULT_HOMEPAGE_CONTENT["hero_headline"],
+            "hero_subtitle": content.hero_subtitle or DEFAULT_HOMEPAGE_CONTENT["hero_subtitle"],
+            "cta_button_text": content.cta_button_text or DEFAULT_HOMEPAGE_CONTENT["cta_button_text"],
+            "cta_button_link": content.cta_button_link,
+            "hero_youtube_url": content.hero_youtube_url or DEFAULT_HOMEPAGE_CONTENT["hero_youtube_url"],
+        }
+
+    headline_lines = [line.strip() for line in content_data["hero_headline"].splitlines() if line.strip()]
+    if not headline_lines:
+        headline_lines = DEFAULT_HOMEPAGE_CONTENT["hero_headline"].splitlines()
+    content_data["hero_headline_lines"] = headline_lines
+    return content_data
+
+
+def _get_session_date_label(session_type: str, session_date: str) -> str:
+    for option in get_active_class_date_options().get(session_type, []):
+        if option["value"] == session_date:
+            return option["full_label"]
+
+    for option in FALLBACK_CLASS_DATES.get(session_type, []):
+        if option["value"] == session_date:
+            return option["full_label"]
+    return session_date
+
+
+def _build_home_context(**overrides) -> dict:
+    class_date_options = overrides.pop("class_date_options", None) or get_active_class_date_options()
+    context = {
+        "benefits": BENEFITS,
+        "faqs": FAQS,
+        "homepage_content": _get_homepage_content(),
+        "reservation_date_options": class_date_options,
+        "blog_articles": BlogArticle.objects.filter(is_published=True).order_by("-created_at")[:3],
+    }
+    context.update(overrides)
+    return context
+
+
 def _send_submission_emails(submission: Submission) -> None:
     from_email = settings.DEFAULT_FROM_EMAIL
     admin_to = [settings.LANDING_ADMIN_EMAIL]
     first_name = _extract_first_name(submission.name)
     session_type = submission.get_session_type_display() if submission.session_type else "Not provided"
-    session_date = SESSION_DATE_LABELS.get(submission.session_type, {}).get(
-        submission.session_date, submission.get_session_date_display()
-    )
+    session_date = _get_session_date_label(submission.session_type, submission.session_date)
 
     admin_subject = f"New registration entry from {submission.name}"
     admin_body = render_to_string(
@@ -164,10 +198,12 @@ def home(request):
     if request.method == "GET" and not lead_success and not reservation_success:
         request.session.pop(LEAD_DETAILS_SESSION_KEY, None)
         lead_details_completed = False
+    class_date_options = get_active_class_date_options()
     reservation_form = ReservationForm(
         prefix="reservation",
         initial={"session_type": Reservation.SessionType.PHYSICAL},
         is_locked=not lead_details_completed,
+        class_date_options=class_date_options,
     )
 
     if request.method == "POST":
@@ -230,6 +266,7 @@ def home(request):
                         "session_date": request.POST.get("payload_session_date", ""),
                     },
                     is_locked=not lead_details_completed,
+                    class_date_options=class_date_options,
                 )
                 reservation_success = None
             elif ui_action == "reset":
@@ -237,14 +274,25 @@ def home(request):
                     prefix="reservation",
                     initial={"session_type": Reservation.SessionType.PHYSICAL},
                     is_locked=not lead_details_completed,
+                    class_date_options=class_date_options,
                 )
                 reservation_success = None
             else:
                 if not lead_details_completed:
-                    reservation_form = ReservationForm(request.POST, prefix="reservation", is_locked=True)
+                    reservation_form = ReservationForm(
+                        request.POST,
+                        prefix="reservation",
+                        is_locked=True,
+                        class_date_options=class_date_options,
+                    )
                     reservation_gate_message = "Complete your details in the form above before reserving a spot."
                 else:
-                    reservation_form = ReservationForm(request.POST, prefix="reservation", is_locked=False)
+                    reservation_form = ReservationForm(
+                        request.POST,
+                        prefix="reservation",
+                        is_locked=False,
+                        class_date_options=class_date_options,
+                    )
                     if reservation_form.is_valid():
                         lead_details = request.session.get(LEAD_DETAILS_SESSION_KEY) or {}
                         lead_name = str(lead_details.get("name", "")).strip()
@@ -255,21 +303,25 @@ def home(request):
                             reservation_gate_message = "Please complete your contact details before final submission."
                             lead_details_completed = False
                             request.session.pop(LEAD_DETAILS_SESSION_KEY, None)
-                            reservation_form = ReservationForm(request.POST, prefix="reservation", is_locked=True)
+                            reservation_form = ReservationForm(
+                                request.POST,
+                                prefix="reservation",
+                                is_locked=True,
+                                class_date_options=class_date_options,
+                            )
                             return render(
                                 request,
                                 "landing/home.html",
-                                {
-                                    "lead_form": lead_form,
-                                    "reservation_form": reservation_form,
-                                    "lead_success": lead_success,
-                                    "reservation_success": reservation_success,
-                                    "lead_details_completed": lead_details_completed,
-                                    "lead_error_message": lead_error_message,
-                                    "reservation_gate_message": reservation_gate_message,
-                                    "benefits": BENEFITS,
-                                    "faqs": FAQS,
-                                },
+                                _build_home_context(
+                                    lead_form=lead_form,
+                                    reservation_form=reservation_form,
+                                    lead_success=lead_success,
+                                    reservation_success=reservation_success,
+                                    lead_details_completed=lead_details_completed,
+                                    lead_error_message=lead_error_message,
+                                    reservation_gate_message=reservation_gate_message,
+                                    class_date_options=class_date_options,
+                                ),
                             )
 
                         measured_height = _sanitize_measured_height(request.POST.get("measured_height"))
@@ -298,15 +350,24 @@ def home(request):
                         return redirect(f"{reverse('home')}#booking")
                     reservation_gate_message = _first_form_error(reservation_form) or "Please choose a reservation date."
 
-    context = {
-        "lead_form": lead_form,
-        "reservation_form": reservation_form,
-        "lead_success": lead_success,
-        "reservation_success": reservation_success,
-        "lead_details_completed": lead_details_completed,
-        "lead_error_message": lead_error_message,
-        "reservation_gate_message": reservation_gate_message,
-        "benefits": BENEFITS,
-        "faqs": FAQS,
-    }
+    context = _build_home_context(
+        lead_form=lead_form,
+        reservation_form=reservation_form,
+        lead_success=lead_success,
+        reservation_success=reservation_success,
+        lead_details_completed=lead_details_completed,
+        lead_error_message=lead_error_message,
+        reservation_gate_message=reservation_gate_message,
+        class_date_options=class_date_options,
+    )
     return render(request, "landing/home.html", context)
+
+
+def blog_list(request):
+    articles = BlogArticle.objects.filter(is_published=True).order_by("-created_at")
+    return render(request, "landing/blog_list.html", {"articles": articles})
+
+
+def blog_detail(request, slug):
+    article = get_object_or_404(BlogArticle, slug=slug, is_published=True)
+    return render(request, "landing/blog_detail.html", {"article": article})

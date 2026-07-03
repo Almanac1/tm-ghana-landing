@@ -67,14 +67,24 @@
     <div class="hero-overlay"></div>
     <div class="hero-content">
       <div class="hero-copy">
-        <h1><span>Think Clearly.</span>
-            <span class="T1-feel-balance">Feel Balance.</span>
-            <span>Work Better.</span>
+        <h1>
+          {% for line in homepage_content.hero_headline_lines %}
+            <span{% if forloop.counter == 2 %} class="T1-feel-balance"{% endif %}>{{ line }}</span>
+          {% endfor %}
         </h1>
+        {% if homepage_content.hero_subtitle %}
+          <p class="hero-subtitle">{{ homepage_content.hero_subtitle }}</p>
+        {% endif %}
         <div class="hero-cta">
-          <button type="button" class="hero-secondary-btn" id="watchVideoBtn" aria-haspopup="dialog" aria-controls="heroVideoModal" data-video-url="https://www.youtube.com/embed/AL_c-sV9zXc?enablejsapi=1">
-            Watch Video
-          </button>
+          {% if homepage_content.cta_button_link %}
+            <a class="hero-secondary-btn" href="{{ homepage_content.cta_button_link }}">
+              {{ homepage_content.cta_button_text|default:"Watch Video" }}
+            </a>
+          {% else %}
+            <button type="button" class="hero-secondary-btn" id="watchVideoBtn" aria-haspopup="dialog" aria-controls="heroVideoModal" data-video-url="{{ homepage_content.hero_youtube_url }}">
+              {{ homepage_content.cta_button_text|default:"Watch Video" }}
+            </button>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -92,7 +102,7 @@
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowfullscreen
             referrerpolicy="strict-origin-when-cross-origin"></iframe>
-          <a class="hero-video-fallback" id="heroVideoFallback" href="https://www.youtube.com/watch?v=AL_c-sV9zXc" target="_blank" rel="noopener noreferrer" hidden>
+          <a class="hero-video-fallback" id="heroVideoFallback" href="{{ homepage_content.hero_youtube_url }}" target="_blank" rel="noopener noreferrer" hidden>
             Open video on YouTube
           </a>
         </div>
@@ -232,6 +242,7 @@
                 data-session-mode="{{ reservation_form.session_type.value|default:'physical' }}"
                 {% if not lead_details_completed %}aria-disabled="true"{% endif %}>
               </div>
+              {{ reservation_date_options|json_script:"reservationDateOptionsData" }}
             </div>
 
             <!-- Submit Button -->
@@ -306,11 +317,30 @@
   <!-- Blogs Placeholder Section -->
   <section class="blogs-section" id="blogs">
     <div class="container">
-      <div class="blogs-placeholder-card">
-        <p class="blogs-kicker">Blogs</p>
-        <h2>Blogs coming soon</h2>
-        <p>We&rsquo;re preparing helpful articles on Transcendental Meditation, clarity, balance, and better living.</p>
-      </div>
+      {% if blog_articles %}
+        <div class="blogs-header">
+          <p class="blogs-kicker">Blogs</p>
+          <h2>Latest articles</h2>
+        </div>
+        <div class="blogs-grid">
+          {% for article in blog_articles %}
+            <article class="blog-card">
+              <p class="blog-card-date">{{ article.created_at|date:"F j, Y" }}</p>
+              <h3><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h3>
+              <p>{{ article.excerpt }}</p>
+            </article>
+          {% endfor %}
+        </div>
+        <div class="blogs-actions">
+          <a class="blogs-link" href="{% url 'blog_list' %}">View all articles</a>
+        </div>
+      {% else %}
+        <div class="blogs-placeholder-card">
+          <p class="blogs-kicker">Blogs</p>
+          <h2>Blogs coming soon</h2>
+          <p>We&rsquo;re preparing helpful articles on Transcendental Meditation, clarity, balance, and better living.</p>
+        </div>
+      {% endif %}
     </div>
   </section>
 

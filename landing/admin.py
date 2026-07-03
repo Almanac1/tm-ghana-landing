@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import LeadCapture, Reservation, Submission
+from .models import BlogArticle, ClassDate, HomePageContent, LeadCapture, Reservation, Submission
 
 
 admin.site.site_header = "Meditation Landing Admin"
@@ -23,6 +23,52 @@ class LeadCaptureAdmin(admin.ModelAdmin):
     )
 
 
+@admin.register(ClassDate)
+class ClassDateAdmin(admin.ModelAdmin):
+    list_display = ("date", "time", "session_type", "is_active", "display_order")
+    list_editable = ("is_active", "display_order")
+    list_filter = ("session_type", "is_active", "date")
+    ordering = ("display_order", "date", "time")
+    list_per_page = 25
+
+    fieldsets = (
+        ("Class details", {"fields": ("session_type", "date", "time")}),
+        ("Display", {"fields": ("is_active", "display_order")}),
+    )
+
+
+@admin.register(BlogArticle)
+class BlogArticleAdmin(admin.ModelAdmin):
+    list_display = ("title", "slug", "is_published", "created_at", "updated_at")
+    list_filter = ("is_published", "created_at", "updated_at")
+    search_fields = ("title", "excerpt", "body")
+    prepopulated_fields = {"slug": ("title",)}
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-created_at",)
+    list_per_page = 25
+
+    fieldsets = (
+        ("Article", {"fields": ("title", "slug", "excerpt", "body")}),
+        ("Publishing", {"fields": ("is_published",)}),
+        ("Metadata", {"fields": ("created_at", "updated_at")}),
+    )
+
+
+@admin.register(HomePageContent)
+class HomePageContentAdmin(admin.ModelAdmin):
+    list_display = ("hero_headline", "cta_button_text", "is_active", "updated_at")
+    list_filter = ("is_active", "updated_at")
+    readonly_fields = ("updated_at",)
+    ordering = ("-updated_at",)
+    list_per_page = 10
+
+    fieldsets = (
+        ("Hero", {"fields": ("hero_headline", "hero_subtitle", "hero_youtube_url")}),
+        ("CTA", {"fields": ("cta_button_text", "cta_button_link")}),
+        ("Status", {"fields": ("is_active", "updated_at")}),
+    )
+
+
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
     list_display = ("get_session_date_label", "get_session_type_label", "created_at")
@@ -38,7 +84,7 @@ class ReservationAdmin(admin.ModelAdmin):
 
     @admin.display(description="Session date", ordering="session_date")
     def get_session_date_label(self, obj):
-        return obj.get_session_date_display()
+        return obj.session_date
 
     @admin.display(description="Session type", ordering="session_type")
     def get_session_type_label(self, obj):
@@ -62,7 +108,7 @@ class SubmissionAdmin(admin.ModelAdmin):
 
     @admin.display(description="Session date", ordering="session_date")
     def get_session_date_label(self, obj):
-        return obj.get_session_date_display()
+        return obj.session_date
 
     @admin.display(description="Session type", ordering="session_type")
     def get_session_type_label(self, obj):

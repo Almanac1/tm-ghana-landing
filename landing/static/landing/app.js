@@ -185,9 +185,9 @@ const heroVideoModal = document.getElementById('heroVideoModal');
 const closeHeroVideoBtn = document.getElementById('closeHeroVideo');
 const heroVideoFrame = document.getElementById('heroVideoFrame');
 const heroVideoFallback = document.getElementById('heroVideoFallback');
-const heroVideoUrl = 'https://www.youtube.com/embed/AL_c-sV9zXc?enablejsapi=1';
+const heroVideoUrl = watchVideoBtn?.dataset.videoUrl || 'https://www.youtube.com/embed/AL_c-sV9zXc?enablejsapi=1';
 
-if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
+if (heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   let lastFocusedElement = null;
   let activeFallbackUrl = 'https://www.youtube.com/watch?v=AL_c-sV9zXc';
   let activeVideoAnalytics = null;
@@ -499,15 +499,17 @@ if (watchVideoBtn && heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
     setVideoFallbackState(true, activeFallbackUrl);
   });
 
-  watchVideoBtn.addEventListener('click', (event) => {
-    event.preventDefault();
-    lastFocusedElement = document.activeElement;
-    setHeroVideoOpenState(true, watchVideoBtn.dataset.videoUrl || heroVideoUrl, {
-      video_type: 'hero',
-      video_title: heroVideoFrame.title || watchVideoBtn.textContent?.trim() || undefined,
-      section: 'hero'
+  if (watchVideoBtn) {
+    watchVideoBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      lastFocusedElement = document.activeElement;
+      setHeroVideoOpenState(true, watchVideoBtn.dataset.videoUrl || heroVideoUrl, {
+        video_type: 'hero',
+        video_title: heroVideoFrame.title || watchVideoBtn.textContent?.trim() || undefined,
+        section: 'hero'
+      });
     });
-  });
+  }
 
   document.querySelectorAll('.testimonial-card[data-video-url]').forEach(card => {
     const openTestimonialVideo = () => {
@@ -563,7 +565,22 @@ const reservationDateOptions = document.getElementById('reservationDateOptions')
 const reservationSubmitBtn = document.getElementById('reservationSubmitBtn');
 const reservationUnlockNote = document.getElementById('reservationUnlockNote');
 let reservationFormStarted = false;
-const reservationDateOptionsByMode = {
+const getReservationDateOptionsByMode = () => {
+  const script = document.getElementById('reservationDateOptionsData');
+  if (!script?.textContent) return null;
+
+  try {
+    const parsedOptions = JSON.parse(script.textContent);
+    if (parsedOptions && typeof parsedOptions === 'object') {
+      return parsedOptions;
+    }
+  } catch (error) {
+    return null;
+  }
+
+  return null;
+};
+const reservationDateOptionsByMode = getReservationDateOptionsByMode() || {
   physical: [
     { value: '2026-07-04', label: 'Saturday, July 4' },
     { value: '2026-07-11', label: 'Saturday, July 11' },
