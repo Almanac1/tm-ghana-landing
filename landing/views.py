@@ -94,7 +94,7 @@ def _get_homepage_content() -> dict:
     else:
         content_data = {
             "hero_headline": content.hero_headline or DEFAULT_HOMEPAGE_CONTENT["hero_headline"],
-            "hero_subtitle": content.hero_subtitle or DEFAULT_HOMEPAGE_CONTENT["hero_subtitle"],
+            "hero_subtitle": content.hero_subtitle,
             "cta_button_text": content.cta_button_text or DEFAULT_HOMEPAGE_CONTENT["cta_button_text"],
             "cta_button_link": content.cta_button_link,
             "hero_youtube_url": content.hero_youtube_url or DEFAULT_HOMEPAGE_CONTENT["hero_youtube_url"],
