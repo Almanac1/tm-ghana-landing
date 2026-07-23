@@ -1,0 +1,60 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Transcendental Meditation Nigeria{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Learn about Transcendental Meditation in Nigeria.{% endblock %}">
+  <link rel="stylesheet" href="{% static 'landing/styles.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% block body_start %}{% endblock %}
+  <header class="header {% block header_class %}navbar-highlighted is-scrolled{% endblock %}">
+    <div class="container header-container">
+      <div class="logo">
+        <a href="{% url 'home' %}" aria-label="Transcendental Meditation Nigeria home">
+          <img
+            src="{% block logo_src %}{% static 'landing/images/logo_midnight.svg' %}{% endblock %}"
+            alt="Transcendental Meditation"
+            class="logo-image"
+            data-default-logo="{% block default_logo %}{% static 'landing/images/logo_midnight.svg' %}{% endblock %}"
+            data-hover-logo="{% static 'landing/images/logo_midnight.svg' %}">
+        </a>
+      </div>
+      <nav class="nav-menu" aria-label="Primary navigation">
+        <a href="{% if request.resolver_match.url_name == 'home' %}#home{% else %}{% url 'home' %}#home{% endif %}" class="nav-link">Home</a>
+        <a href="{% if request.resolver_match.url_name == 'home' %}#booking{% else %}{% url 'home' %}#booking{% endif %}" class="nav-link">Book a Date</a>
+        <a href="{% if request.resolver_match.url_name == 'home' %}#testimonials{% else %}{% url 'home' %}#testimonials{% endif %}" class="nav-link">Testimonials</a>
+        <a href="{% if request.resolver_match.url_name == 'home' %}#blogs{% else %}{% url 'blog_list' %}{% endif %}" class="nav-link">Blogs</a>
+        <a href="{% if request.resolver_match.url_name == 'home' %}#contact{% else %}{% url 'home' %}#contact{% endif %}" class="nav-link">Contact Us</a>
+      </nav>
+      <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open navigation menu" aria-controls="mobileNav" aria-expanded="false">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobile navigation">
+      <a href="{% if request.resolver_match.url_name == 'home' %}#home{% else %}{% url 'home' %}#home{% endif %}">Home</a>
+      <a href="{% if request.resolver_match.url_name == 'home' %}#booking{% else %}{% url 'home' %}#booking{% endif %}">Book a Date</a>
+      <a href="{% if request.resolver_match.url_name == 'home' %}#testimonials{% else %}{% url 'home' %}#testimonials{% endif %}">Testimonials</a>
+      <a href="{% if request.resolver_match.url_name == 'home' %}#blogs{% else %}{% url 'blog_list' %}{% endif %}">Blogs</a>
+      <a href="{% if request.resolver_match.url_name == 'home' %}#contact{% else %}{% url 'home' %}#contact{% endif %}">Contact Us</a>
+    </nav>
+  </header>
+
+  {% block content %}{% endblock %}
+
+  <footer class="footer">
+    <div class="container footer-content">
+      <p>&copy; 2025 Transcendental Meditation (Nigeria)</p>
+      <a href="{% url 'privacy_policy' %}">Privacy Policy</a>
+    </div>
+  </footer>
+
+  <script src="{% static 'landing/app.js' %}?v=20260620-video-tracking"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

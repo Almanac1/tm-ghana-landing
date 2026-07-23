@@ -4,7 +4,55 @@ from django.core import mail
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from .models import Reservation, Submission
+from .models import BlogArticle, Reservation, Submission
+
+
+class PrivacyPolicyPageTests(TestCase):
+    def test_privacy_policy_page_renders_expected_content(self):
+        response = self.client.get(reverse("privacy_policy"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "landing/privacy_policy.html")
+        self.assertTemplateUsed(response, "landing/base.html")
+        self.assertContains(response, "<h1>Privacy Policy</h1>", html=True)
+        self.assertContains(response, "Last updated:</strong> July 23, 2026")
+
+    def test_global_footer_links_to_named_privacy_policy_url(self):
+        for route_name in ("home", "blog_list", "privacy_policy"):
+            with self.subTest(route_name=route_name):
+                response = self.client.get(reverse(route_name))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response,
+                    f'<a href="{reverse("privacy_policy")}">Privacy Policy</a>',
+                    html=True,
+                )
+
+    def test_landing_form_contains_linked_privacy_notice(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(
+            response,
+            "TM Nigeria may use the information you provide to process your registration",
+        )
+        self.assertContains(
+            response,
+            f'<a href="{reverse("privacy_policy")}">Privacy Policy</a>',
+            html=True,
+            count=2,
+        )
+
+    def test_existing_public_pages_continue_to_load(self):
+        article = BlogArticle.objects.create(
+            title="A calmer day",
+            excerpt="A short introduction.",
+            body="Article content.",
+            is_published=True,
+        )
+
+        for url in (reverse("home"), reverse("blog_list"), article.get_absolute_url()):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 200)
 
 
 @override_settings(

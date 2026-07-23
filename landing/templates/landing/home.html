@@ -1,11 +1,13 @@
+{% extends "landing/base.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Transcendental Meditation - Master Stress, Find Balance</title>
-  <link rel="stylesheet" href="{% static 'landing/styles.css' %}">
+
+{% block title %}Transcendental Meditation - Master Stress, Find Balance{% endblock %}
+{% block meta_description %}Discover Transcendental Meditation in Nigeria and reserve a free introductory session.{% endblock %}
+{% block header_class %}{% endblock %}
+{% block logo_src %}{% static 'landing/images/Logo.svg' %}{% endblock %}
+{% block default_logo %}{% static 'landing/images/Logo.svg' %}{% endblock %}
+
+{% block extra_head %}
   <!-- Direct GA4 gtag.js is currently installed below; leave in place until deciding whether to migrate fully to GTM. -->
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-ET975BCN37"></script>
@@ -23,40 +25,16 @@
   'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
   })(window,document,'script','dataLayer','GTM-TVNNFC4Q');</script>
   <!-- End Google Tag Manager -->
-</head>
-<body>
+{% endblock %}
+
+{% block body_start %}
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TVNNFC4Q"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
-  <!-- Navigation Header -->
-  <header class="header">
-    <div class="container header-container">
-      <div class="logo">
-        <img src="{% static 'landing/images/Logo.svg' %}" alt="Transcendental Meditation" class="logo-image" data-default-logo="{% static 'landing/images/Logo.svg' %}" data-hover-logo="{% static 'landing/images/logo_midnight.svg' %}">
-      </div>
-      <nav class="nav-menu">
-        <a href="#home" class="nav-link">Home</a>
-        <a href="#booking" class="nav-link">Book a Date</a>
-        <a href="#testimonials" class="nav-link">Testimonials</a>
-        <a href="#blogs" class="nav-link">Blogs</a>
-        <a href="#contact" class="nav-link">Contact Us</a>
-      </nav>
-      <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="Open navigation menu" aria-controls="mobileNav" aria-expanded="false">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-    </div>
-    <nav class="mobile-nav" id="mobileNav">
-      <a href="#home">Home</a>
-      <a href="#booking">Book a Date</a>
-      <a href="#testimonials">Testimonials</a>
-      <a href="#blogs">Blogs</a>
-      <a href="#contact">Contact Us</a>
-    </nav>
-  </header>
+{% endblock %}
 
+{% block content %}
   <!-- Hero Section -->
   <section class="hero" id="home">
     <div class="hero-media" aria-hidden="true">
@@ -173,7 +151,7 @@
             </div>
           </div>
           <button type="submit" class="submit-btn btn waves-effect waves-light">Submit Form</button>
-          <p class="form-disclaimer">By submitting this form, you agree to be contacted regarding your inquiry.</p>
+          <p class="form-disclaimer">By submitting this form, you agree that TM Nigeria may use the information you provide to process your registration and contact you about your selected introductory talk. Please review our <a href="{% url 'privacy_policy' %}">Privacy Policy</a>.</p>
         </div>
         {% endif %}
       </form>
@@ -400,13 +378,4 @@
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="container">
-      <p>&copy; 2025 Transcendental Meditation (Nigeria)</p>
-    </div>
-  </footer>
-
-  <script src="{% static 'landing/app.js' %}?v=20260620-video-tracking"></script>
-</body>
-</html>
+{% endblock %}

@@ -617,6 +617,16 @@ body.hero-video-open {
   overflow-wrap: anywhere;
 }
 
+.contact-form .form-disclaimer a {
+  color: #462850;
+  font-weight: 500;
+  text-underline-offset: 0.16em;
+}
+
+.contact-form .form-disclaimer a:hover {
+  color: #a55f00;
+}
+
 .contact-form .form-subtitle {
   max-width: min(100%, 58ch);
   font-family: "Neue Haas Unica", sans-serif;
@@ -1839,6 +1849,7 @@ body.hero-video-open {
   text-transform: uppercase;
 }
 
+.blog-card h2,
 .blog-card h3 {
   margin: 0 0 12px;
   color: #462850;
@@ -1925,6 +1936,147 @@ body.hero-video-open {
   font-size: clamp(1rem, 0.9rem + 0.45vw, 1.25rem);
   font-weight: 300;
   line-height: 1.65;
+}
+
+/* ====== PRIVACY POLICY ====== */
+.policy-page {
+  min-height: 100vh;
+  padding: clamp(118px, 14vw, 154px) 20px clamp(60px, 8vw, 96px);
+  background:
+    radial-gradient(circle at top right, rgba(245, 170, 10, 0.12), transparent 34rem),
+    #fff;
+}
+
+.policy-card {
+  width: min(100%, 880px);
+  margin: 0 auto;
+}
+
+.policy-header {
+  padding-bottom: clamp(28px, 5vw, 46px);
+  border-bottom: 1px solid rgba(70, 40, 80, 0.14);
+}
+
+.policy-kicker {
+  margin-bottom: 10px;
+  color: #a55f00;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.policy-header h1 {
+  margin-bottom: 12px;
+  color: #462850;
+  font-size: clamp(2.45rem, 1.75rem + 3vw, 4.5rem);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.policy-updated {
+  margin-bottom: 22px;
+  color: rgba(70, 40, 80, 0.76);
+  font-size: 0.94rem;
+}
+
+.policy-header > p:last-child {
+  max-width: 72ch;
+  color: rgba(70, 40, 80, 0.84);
+  font-size: clamp(1.04rem, 0.96rem + 0.35vw, 1.2rem);
+  line-height: 1.75;
+}
+
+.policy-contents {
+  margin: clamp(28px, 5vw, 44px) 0;
+  padding: clamp(22px, 4vw, 32px);
+  background: #f9f7e9;
+  border: 1px solid rgba(245, 170, 10, 0.22);
+  border-radius: 8px;
+}
+
+.policy-contents h2 {
+  margin-bottom: 12px;
+  font-size: 1.18rem;
+  font-weight: 500;
+}
+
+.policy-contents ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 28px;
+  padding-left: 1.25rem;
+}
+
+.policy-card section {
+  scroll-margin-top: 110px;
+  margin-top: clamp(38px, 6vw, 58px);
+}
+
+.policy-card section > h2 {
+  margin-bottom: 18px;
+  color: #462850;
+  font-size: clamp(1.65rem, 1.35rem + 1vw, 2.15rem);
+  font-weight: 400;
+  line-height: 1.25;
+}
+
+.policy-card h3 {
+  margin: 30px 0 10px;
+  color: #462850;
+  font-size: clamp(1.16rem, 1.06rem + 0.4vw, 1.4rem);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.policy-card section p,
+.policy-card section li,
+.policy-card address {
+  color: rgba(70, 40, 80, 0.84);
+  line-height: 1.78;
+}
+
+.policy-card section p + p {
+  margin-top: 14px;
+}
+
+.policy-card ul {
+  margin: 14px 0 18px;
+  padding-left: 1.4rem;
+}
+
+.policy-card li + li {
+  margin-top: 6px;
+}
+
+.policy-card a,
+.footer a {
+  color: #462850;
+  font-weight: 500;
+  text-underline-offset: 0.18em;
+}
+
+.policy-card a:hover,
+.footer a:hover {
+  color: #a55f00;
+}
+
+.policy-card address {
+  margin-top: 14px;
+  padding: 20px 22px;
+  background: #f9f7e9;
+  border-left: 3px solid #f5aa0a;
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+
+.policy-card a:focus-visible,
+.footer a:focus-visible,
+.contact-form .form-disclaimer a:focus-visible {
+  outline: 3px solid rgba(245, 170, 10, 0.8);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 /* ====== FAQ SECTION ====== */
@@ -2096,6 +2248,18 @@ details[open] .faq-icon {
   margin: 0;
 }
 
+.footer-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+
+.footer a {
+  font-size: 0.94em;
+}
+
 /* ====== RESPONSIVE DESIGN ====== */
 @media (max-width: 936px) {
   .testimonials-layout {
@@ -2172,6 +2336,10 @@ details[open] .faq-icon {
 }
 
 @media (max-width: 768px) {
+  .policy-contents ol {
+    grid-template-columns: 1fr;
+  }
+
   .blogs-grid {
     grid-template-columns: 1fr;
   }
@@ -2420,6 +2588,15 @@ details[open] .faq-icon {
 }
 
 @media (max-width: 480px) {
+  .policy-page {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .policy-contents {
+    padding: 20px;
+  }
+
   .header-container {
     gap: 20px;
     min-height: 76px;

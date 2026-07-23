@@ -371,3 +371,11 @@ def blog_list(request):
 def blog_detail(request, slug):
     article = get_object_or_404(BlogArticle, slug=slug, is_published=True)
     return render(request, "landing/blog_detail.html", {"article": article})
+
+
+def privacy_policy(request):
+    return render(
+        request,
+        "landing/privacy_policy.html",
+        {"privacy_contact_email": settings.PRIVACY_CONTACT_EMAIL},
+    )
