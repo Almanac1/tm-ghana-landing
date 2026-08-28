@@ -1,41 +1,48 @@
+from datetime import timedelta
+
 from django import forms
+from django.utils import timezone
 
 from .models import ClassDate, LeadCapture, Reservation
 
 
-FALLBACK_CLASS_DATES = {
-    Reservation.SessionType.PHYSICAL: [
-        {"value": "2026-07-04", "label": "Saturday, July 4", "full_label": "Saturday, July 4, 2026"},
-        {"value": "2026-07-11", "label": "Saturday, July 11", "full_label": "Saturday, July 11, 2026"},
-        {"value": "2026-07-18", "label": "Saturday, July 18", "full_label": "Saturday, July 18, 2026"},
-        {"value": "2026-07-25", "label": "Saturday, July 25", "full_label": "Saturday, July 25, 2026"},
-    ],
-    Reservation.SessionType.ONLINE: [
-        {"value": "2026-07-01", "label": "Wednesday, July 1", "full_label": "Wednesday, July 1, 2026"},
-        {"value": "2026-07-08", "label": "Wednesday, July 8", "full_label": "Wednesday, July 8, 2026"},
-        {"value": "2026-07-15", "label": "Wednesday, July 15", "full_label": "Wednesday, July 15, 2026"},
-        {"value": "2026-07-22", "label": "Wednesday, July 22", "full_label": "Wednesday, July 22, 2026"},
-        {"value": "2026-07-29", "label": "Wednesday, July 29", "full_label": "Wednesday, July 29, 2026"},
-    ],
-}
+FALLBACK_SESSION_COUNT = 5
+
+
+def _date_option(session_date):
+    return {
+        "value": session_date.isoformat(),
+        "label": session_date.strftime("%A, %B %-d"),
+        "full_label": session_date.strftime("%A, %B %-d, %Y"),
+    }
+
+
+def _next_wednesday_options(count=FALLBACK_SESSION_COUNT):
+    today = timezone.localdate()
+    days_until_wednesday = (2 - today.weekday()) % 7
+    first_wednesday = today + timedelta(days=days_until_wednesday)
+    return [_date_option(first_wednesday + timedelta(weeks=index)) for index in range(count)]
 
 
 def get_active_class_date_options():
-    options = {Reservation.SessionType.PHYSICAL: [], Reservation.SessionType.ONLINE: []}
-    class_dates = ClassDate.objects.filter(is_active=True).order_by("display_order", "date", "time")
+    """Return active, upcoming Wednesday dates for online introductory sessions."""
+    today = timezone.localdate()
+    class_dates = ClassDate.objects.filter(
+        is_active=True,
+        session_type=Reservation.SessionType.ONLINE,
+        date__gte=today,
+    ).order_by("display_order", "date", "time")
 
-    for class_date in class_dates:
-        options[class_date.session_type].append(
-            {
-                "value": class_date.value,
-                "label": class_date.display_label,
-                "full_label": class_date.full_display_label,
-            }
-        )
-
-    if not options[Reservation.SessionType.PHYSICAL] and not options[Reservation.SessionType.ONLINE]:
-        return FALLBACK_CLASS_DATES
-    return options
+    options = [
+        {
+            "value": class_date.value,
+            "label": class_date.display_label,
+            "full_label": class_date.full_display_label,
+        }
+        for class_date in class_dates
+        if class_date.date.weekday() == 2
+    ]
+    return options or _next_wednesday_options()
 
 
 class LeadCaptureForm(forms.ModelForm):
@@ -78,22 +85,25 @@ class LeadCaptureForm(forms.ModelForm):
 
 
 class ReservationForm(forms.ModelForm):
+    session_date = forms.ChoiceField(widget=forms.RadioSelect())
+
     def __init__(self, *args, **kwargs):
         is_locked = kwargs.pop("is_locked", False)
         class_date_options = kwargs.pop("class_date_options", None) or get_active_class_date_options()
         super().__init__(*args, **kwargs)
         self.class_date_options = class_date_options
         self.fields["session_date"].choices = [
-            (option["value"], option["full_label"])
-            for mode_options in class_date_options.values()
-            for option in mode_options
+            (option["value"], option["full_label"]) for option in class_date_options
         ]
         self.fields["session_date"].disabled = is_locked
 
+    def save(self, commit=True):
+        reservation = super().save(commit=False)
+        reservation.session_type = Reservation.SessionType.ONLINE
+        if commit:
+            reservation.save()
+        return reservation
+
     class Meta:
         model = Reservation
-        fields = ["session_date", "session_type"]
-        widgets = {
-            "session_date": forms.RadioSelect(),
-            "session_type": forms.HiddenInput(attrs={"id": "reservation-session-type"}),
-        }
+        fields = ["session_date"]

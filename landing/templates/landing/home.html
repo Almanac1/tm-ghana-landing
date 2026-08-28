@@ -166,10 +166,8 @@
         {% csrf_token %}
         <input type="hidden" name="form_type" value="reservation">
         <input type="hidden" name="measured_height" id="reservationMeasuredHeight" value="">
-        {{ reservation_form.session_type }}
         {% if reservation_success %}
         <div class="form-success-state reservation-success-state" id="reservationSuccessState" role="status" aria-live="polite" tabindex="-1">
-          <input type="hidden" name="payload_session_type" value="{{ reservation_success.payload.session_type }}">
           <input type="hidden" name="payload_session_date" value="{{ reservation_success.payload.session_date }}">
           <input type="hidden" name="payload_measured_height" value="{{ reservation_success.payload.measured_height|default:'' }}">
           <div class="form-success-icon" aria-hidden="true">
@@ -189,35 +187,19 @@
         <div class="reservation-inner" id="reservationFormFields">
           <div class="reservation-header">
             <h2 class="form-title">Reserve Your Spot</h2>
-            <p class="form-subtitle">Select how & when you would like to join 
-              <span>(Choose only one option)</span></p>
+            <p class="form-subtitle">Select a Wednesday to join our online introductory session</p>
           </div>
           {% if reservation_gate_message %}
             <p class="reservation-gate-alert" role="alert">{{ reservation_gate_message }}</p>
           {% endif %}
           <fieldset class="reservation-lock-shell{% if not lead_details_completed %} is-locked{% endif %}" id="reservationLockShell"{% if not lead_details_completed %} disabled aria-describedby="reservationGateNote"{% endif %}>
             <div class="toggle-list-component">
-              <!-- Session Toggle (Segmented Control) -->
-              <div class="toggle-proper-selector">
-                <div class="segmented-control reservation-session-control{% if not lead_details_completed %} is-locked{% endif %}" id="reservationSessionControl" role="radiogroup" aria-label="Choose session mode" aria-disabled="{% if lead_details_completed %}false{% else %}true{% endif %}">
-                  <label class="toggle-pill{% if reservation_form.session_type.value != 'online' %} active{% endif %}">
-                    <input type="radio" name="reservation_session_mode_ui" value="physical"{% if reservation_form.session_type.value != 'online' %} checked{% endif %}{% if not lead_details_completed %} disabled{% endif %}>
-                    <span class="toggle-pill-label">Physical Session</span>
-                  </label>
-                  <label class="toggle-pill{% if reservation_form.session_type.value == 'online' %} active{% endif %}">
-                    <input type="radio" name="reservation_session_mode_ui" value="online"{% if reservation_form.session_type.value == 'online' %} checked{% endif %}{% if not lead_details_completed %} disabled{% endif %}>
-                    <span class="toggle-pill-label">Online Session</span>
-                  </label>
-                </div>
-              </div>
-
               <!-- Date Options -->
               <div
                 class="date-options{% if not lead_details_completed %} is-locked{% endif %}"
                 id="reservationDateOptions"
                 data-date-field-name="{{ reservation_form.session_date.html_name }}"
                 data-selected-date="{{ reservation_form.session_date.value|default_if_none:'' }}"
-                data-session-mode="{{ reservation_form.session_type.value|default:'physical' }}"
                 {% if not lead_details_completed %}aria-disabled="true"{% endif %}>
               </div>
               {{ reservation_date_options|json_script:"reservationDateOptionsData" }}

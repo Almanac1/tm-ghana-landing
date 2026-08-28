@@ -16,7 +16,7 @@ const getSectionName = (element) => {
 };
 
 const getReservationAnalyticsState = () => ({
-  selected_class_type: document.getElementById('reservation-session-type')?.value || undefined,
+  selected_class_type: 'online',
   selected_session_date: document.getElementById('reservationDateOptions')?.dataset.selectedDate || undefined
 });
 
@@ -552,26 +552,20 @@ if (heroVideoModal && closeHeroVideoBtn && heroVideoFrame) {
   });
 }
 
-// Session Toggle
-const toggleBtns = document.querySelectorAll('.toggle-btn');
-const reservationToggleInputs = document.querySelectorAll('.reservation-session-control input[type="radio"]');
-const reservationTogglePills = document.querySelectorAll('.reservation-session-control .toggle-pill');
-const reservationSessionType = document.getElementById('reservation-session-type');
 const reservationFormCard = document.getElementById('reservationForm');
 const reservationMeasuredHeight = document.getElementById('reservationMeasuredHeight');
 const reservationLockShell = document.getElementById('reservationLockShell');
-const reservationSessionControl = document.getElementById('reservationSessionControl');
 const reservationDateOptions = document.getElementById('reservationDateOptions');
 const reservationSubmitBtn = document.getElementById('reservationSubmitBtn');
 const reservationUnlockNote = document.getElementById('reservationUnlockNote');
 let reservationFormStarted = false;
-const getReservationDateOptionsByMode = () => {
+const getReservationDateOptions = () => {
   const script = document.getElementById('reservationDateOptionsData');
   if (!script?.textContent) return null;
 
   try {
     const parsedOptions = JSON.parse(script.textContent);
-    if (parsedOptions && typeof parsedOptions === 'object') {
+    if (Array.isArray(parsedOptions)) {
       return parsedOptions;
     }
   } catch (error) {
@@ -580,21 +574,7 @@ const getReservationDateOptionsByMode = () => {
 
   return null;
 };
-const reservationDateOptionsByMode = getReservationDateOptionsByMode() || {
-  physical: [
-    { value: '2026-07-04', label: 'Saturday, July 4' },
-    { value: '2026-07-11', label: 'Saturday, July 11' },
-    { value: '2026-07-18', label: 'Saturday, July 18' },
-    { value: '2026-07-25', label: 'Saturday, July 25' }
-  ],
-  online: [
-    { value: '2026-07-01', label: 'Wednesday, July 1' },
-    { value: '2026-07-08', label: 'Wednesday, July 8' },
-    { value: '2026-07-15', label: 'Wednesday, July 15' },
-    { value: '2026-07-22', label: 'Wednesday, July 22' },
-    { value: '2026-07-29', label: 'Wednesday, July 29' }
-  ]
-};
+const availableReservationDates = getReservationDateOptions() || [];
 const reservationInteractiveControls = reservationFormCard
   ? Array.from(
       reservationFormCard.querySelectorAll(
@@ -615,11 +595,6 @@ const setReservationLockedState = (isLocked) => {
     reservationLockShell.setAttribute('aria-describedby', 'reservationGateNote');
   } else {
     reservationLockShell.removeAttribute('aria-describedby');
-  }
-
-  if (reservationSessionControl) {
-    reservationSessionControl.classList.toggle('is-locked', isLocked);
-    reservationSessionControl.setAttribute('aria-disabled', String(isLocked));
   }
 
   if (reservationDateOptions) {
@@ -650,24 +625,15 @@ const setReservationLockedState = (isLocked) => {
   }
 };
 
-const syncReservationPills = () => {
-  document.querySelectorAll('.reservation-session-control .toggle-pill').forEach(pill => {
-    pill.classList.toggle('active', pill.querySelector('input')?.checked);
-  });
-};
-
-const renderReservationDateOptions = (sessionMode, clearSelection = false) => {
+const renderReservationDateOptions = () => {
   if (reservationDateOptions) {
-    const normalizedMode = sessionMode === 'online' ? 'online' : 'physical';
-    const options = reservationDateOptionsByMode[normalizedMode] || reservationDateOptionsByMode.physical;
     const fieldName = reservationDateOptions.dataset.dateFieldName || 'reservation-session_date';
     const isLocked = reservationLockShell?.disabled ?? false;
-    const selectedDate = clearSelection ? '' : (reservationDateOptions.dataset.selectedDate || '');
-    reservationDateOptions.dataset.sessionMode = normalizedMode;
+    const selectedDate = reservationDateOptions.dataset.selectedDate || '';
 
     reservationDateOptions.innerHTML = '';
-    options.forEach((option, index) => {
-      const optionId = `reservation-session-date-${normalizedMode}-${index}`;
+    availableReservationDates.forEach((option, index) => {
+      const optionId = `reservation-session-date-${index}`;
 
       const label = document.createElement('label');
       label.className = `radio-option${isLocked ? ' is-disabled' : ''}`;
@@ -687,23 +653,7 @@ const renderReservationDateOptions = (sessionMode, clearSelection = false) => {
       label.appendChild(text);
       reservationDateOptions.appendChild(label);
     });
-
-    if (clearSelection) {
-      reservationDateOptions.dataset.selectedDate = '';
-    }
   }
-};
-
-const applyReservationSessionMode = (value, clearSelection = false) => {
-  if (!reservationToggleInputs.length || !value) return;
-  const matchedInput = Array.from(reservationToggleInputs).find(input => input.value === value);
-  if (!matchedInput) return;
-  matchedInput.checked = true;
-  if (reservationSessionType) {
-    reservationSessionType.value = value;
-  }
-  renderReservationDateOptions(value, clearSelection);
-  syncReservationPills();
 };
 
 if (reservationDateOptions) {
@@ -713,36 +663,12 @@ if (reservationDateOptions) {
     reservationDateOptions.dataset.selectedDate = target.value;
     pushDataLayerEvent('date_selection', {
       selected_session_date: target.value,
-      selected_class_type: reservationSessionType?.value || reservationDateOptions.dataset.sessionMode || undefined
+      selected_class_type: 'online'
     });
   });
 }
 
-reservationToggleInputs.forEach(input => {
-  input.addEventListener('change', () => {
-    applyReservationSessionMode(input.value, true);
-  });
-});
-
-reservationTogglePills.forEach(pill => {
-  pill.addEventListener('click', () => {
-    const input = pill.querySelector('input');
-    if (!input) return;
-    input.checked = true;
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  });
-});
-
-if (reservationSessionType && !reservationSessionType.value) {
-  reservationSessionType.value = 'physical';
-}
-
-if (reservationSessionType && reservationToggleInputs.length) {
-  const activeMode = reservationDateOptions?.dataset.sessionMode || reservationSessionType.value;
-  applyReservationSessionMode(activeMode, false);
-} else if (reservationDateOptions) {
-  renderReservationDateOptions('physical', false);
-}
+renderReservationDateOptions();
 
 if (reservationFormCard && reservationLockShell) {
   const leadComplete = reservationFormCard.dataset.leadComplete === 'true';

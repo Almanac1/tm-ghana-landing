@@ -1334,10 +1334,14 @@ body.hero-video-open {
 }
 
 .radio-option {
-  display: flex;
-  justify-content: center;
+  --radio-control-size: 24px;
+  display: grid;
+  grid-template-columns:
+    minmax(var(--radio-control-size), 1fr)
+    minmax(0, max-content)
+    minmax(var(--radio-control-size), 1fr);
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
   min-height: auto;
   padding: 0;
   margin: 0;
@@ -1378,13 +1382,14 @@ body.hero-video-open {
 }
 
 .radio-option input {
+  justify-self: end;
   cursor: pointer;
-  width: 24px;
-  height: 24px;
+  width: var(--radio-control-size);
+  height: var(--radio-control-size);
   accent-color: #f3c252;
   margin: 0;
   padding: 0;
-  min-width: 24px;
+  min-width: var(--radio-control-size);
   flex-shrink: 0;
 }
 
@@ -1393,6 +1398,7 @@ body.hero-video-open {
 }
 
 .radio-option span {
+  grid-column: 2;
   white-space: normal;
   text-align: center;
 }

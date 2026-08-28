@@ -8,8 +8,8 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from .forms import FALLBACK_CLASS_DATES, LeadCaptureForm, ReservationForm, get_active_class_date_options
-from .models import BlogArticle, HomePageContent, Reservation, Submission
+from .forms import LeadCaptureForm, ReservationForm, get_active_class_date_options
+from .models import BlogArticle, ClassDate, HomePageContent, Reservation, Submission
 
 
 BENEFITS = [
@@ -107,14 +107,18 @@ def _get_homepage_content() -> dict:
     return content_data
 
 
-def _get_session_date_label(session_type: str, session_date: str) -> str:
-    for option in get_active_class_date_options().get(session_type, []):
+def _get_session_date_label(session_date: str) -> str:
+    for option in get_active_class_date_options():
         if option["value"] == session_date:
             return option["full_label"]
 
-    for option in FALLBACK_CLASS_DATES.get(session_type, []):
-        if option["value"] == session_date:
-            return option["full_label"]
+    scheduled_date = (
+        ClassDate.objects.filter(session_type=Reservation.SessionType.ONLINE, date=session_date)
+        .order_by("display_order", "time")
+        .first()
+    )
+    if scheduled_date:
+        return scheduled_date.full_display_label
     return session_date
 
 
@@ -136,7 +140,7 @@ def _send_submission_emails(submission: Submission) -> None:
     admin_to = [settings.LANDING_ADMIN_EMAIL]
     first_name = _extract_first_name(submission.name)
     session_type = submission.get_session_type_display() if submission.session_type else "Not provided"
-    session_date = _get_session_date_label(submission.session_type, submission.session_date)
+    session_date = _get_session_date_label(submission.session_date)
 
     admin_subject = f"New registration entry from {submission.name}"
     admin_body = render_to_string(
@@ -201,7 +205,6 @@ def home(request):
     class_date_options = get_active_class_date_options()
     reservation_form = ReservationForm(
         prefix="reservation",
-        initial={"session_type": Reservation.SessionType.PHYSICAL},
         is_locked=not lead_details_completed,
         class_date_options=class_date_options,
     )
@@ -261,10 +264,7 @@ def home(request):
             if ui_action == "edit":
                 reservation_form = ReservationForm(
                     prefix="reservation",
-                    initial={
-                        "session_type": request.POST.get("payload_session_type", Reservation.SessionType.PHYSICAL),
-                        "session_date": request.POST.get("payload_session_date", ""),
-                    },
+                    initial={"session_date": request.POST.get("payload_session_date", "")},
                     is_locked=not lead_details_completed,
                     class_date_options=class_date_options,
                 )
@@ -272,7 +272,6 @@ def home(request):
             elif ui_action == "reset":
                 reservation_form = ReservationForm(
                     prefix="reservation",
-                    initial={"session_type": Reservation.SessionType.PHYSICAL},
                     is_locked=not lead_details_completed,
                     class_date_options=class_date_options,
                 )
@@ -330,7 +329,7 @@ def home(request):
                             name=lead_name,
                             email=lead_email,
                             phone=lead_phone,
-                            session_type=reservation_form.cleaned_data.get("session_type", ""),
+                            session_type=Reservation.SessionType.ONLINE,
                             session_date=reservation_form.cleaned_data["session_date"],
                             message=(request.POST.get("message") or "").strip(),
                         )
@@ -342,7 +341,7 @@ def home(request):
                             "form_type": "reservation",
                             "payload": {
                                 "submission_id": submission.id,
-                                "session_type": reservation_form.cleaned_data["session_type"],
+                                "session_type": Reservation.SessionType.ONLINE,
                                 "session_date": reservation_form.cleaned_data["session_date"],
                                 "measured_height": measured_height,
                             },

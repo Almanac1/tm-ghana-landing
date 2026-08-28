@@ -5,10 +5,9 @@ from django.utils.text import slugify
 
 class ClassDate(models.Model):
     class SessionType(models.TextChoices):
-        PHYSICAL = "physical", "Physical Session"
         ONLINE = "online", "Online Session"
 
-    session_type = models.CharField(max_length=12, choices=SessionType.choices)
+    session_type = models.CharField(max_length=12, choices=SessionType.choices, default=SessionType.ONLINE)
     date = models.DateField()
     time = models.TimeField()
     is_active = models.BooleanField(default=True)
@@ -102,17 +101,13 @@ class Reservation(models.Model):
 
     class SessionDate(models.TextChoices):
         JUL1_2026 = "2026-07-01", "Wednesday, July 1, 2026"
-        JUL4_2026 = "2026-07-04", "Saturday, July 4, 2026"
         JUL8_2026 = "2026-07-08", "Wednesday, July 8, 2026"
-        JUL11_2026 = "2026-07-11", "Saturday, July 11, 2026"
         JUL15_2026 = "2026-07-15", "Wednesday, July 15, 2026"
-        JUL18_2026 = "2026-07-18", "Saturday, July 18, 2026"
         JUL22_2026 = "2026-07-22", "Wednesday, July 22, 2026"
-        JUL25_2026 = "2026-07-25", "Saturday, July 25, 2026"
         JUL29_2026 = "2026-07-29", "Wednesday, July 29, 2026"
 
     session_date = models.CharField(max_length=10)
-    session_type = models.CharField(max_length=12, choices=SessionType.choices, default=SessionType.PHYSICAL)
+    session_type = models.CharField(max_length=12, choices=SessionType.choices, default=SessionType.ONLINE)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:
@@ -123,7 +118,12 @@ class Submission(models.Model):
     name = models.CharField(max_length=150)
     email = models.EmailField()
     phone = models.CharField(max_length=20)
-    session_type = models.CharField(max_length=12, choices=Reservation.SessionType.choices, blank=True)
+    session_type = models.CharField(
+        max_length=12,
+        choices=Reservation.SessionType.choices,
+        default=Reservation.SessionType.ONLINE,
+        blank=True,
+    )
     session_date = models.CharField(max_length=10)
     message = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
