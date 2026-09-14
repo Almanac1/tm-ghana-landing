@@ -65,7 +65,7 @@ class PrivacyPolicyPageTests(TestCase):
 class OnlineReservationFlowTests(TestCase):
     def setUp(self):
         today = timezone.localdate()
-        days_until_wednesday = (2 - today.weekday()) % 7 or 7
+        days_until_wednesday = (2 - today.weekday()) % 7
         self.session_date = today + timedelta(days=days_until_wednesday)
         self.class_date = ClassDate.objects.create(
             session_type=Reservation.SessionType.ONLINE,
@@ -114,10 +114,11 @@ class OnlineReservationFlowTests(TestCase):
 
         response = self.client.get(reverse("home"))
 
+        self.assertEqual(len(response.context["reservation_date_options"]), 5)
         self.assertContains(response, "Reserve Your Spot")
         self.assertContains(response, "Select a Wednesday to join our online introductory session")
         self.assertContains(response, self.session_date.isoformat())
-        self.assertNotContains(response, (self.session_date + timedelta(weeks=1)).isoformat())
+        self.assertContains(response, (self.session_date + timedelta(weeks=1)).isoformat())
         self.assertNotContains(response, (self.session_date + timedelta(days=1)).isoformat())
         self.assertNotContains(response, (self.session_date - timedelta(weeks=2)).isoformat())
         self.assertNotContains(response, "Physical Session")

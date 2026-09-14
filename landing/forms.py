@@ -33,16 +33,17 @@ def get_active_class_date_options():
         date__gte=today,
     ).order_by("display_order", "date", "time")
 
-    options = [
-        {
+    options_by_date = {option["value"]: option for option in _next_wednesday_options()}
+    for class_date in class_dates:
+        if class_date.date.weekday() != 2:
+            continue
+        options_by_date[class_date.value] = {
             "value": class_date.value,
             "label": class_date.display_label,
             "full_label": class_date.full_display_label,
         }
-        for class_date in class_dates
-        if class_date.date.weekday() == 2
-    ]
-    return options or _next_wednesday_options()
+
+    return sorted(options_by_date.values(), key=lambda option: option["value"])
 
 
 class LeadCaptureForm(forms.ModelForm):
