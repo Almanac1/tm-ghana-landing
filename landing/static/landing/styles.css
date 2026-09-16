@@ -1332,11 +1332,11 @@ body.hero-video-open {
 .date-options {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 14px;
   margin-bottom: 0;
   width: 100%;
-  max-width: 400px;
+  max-width: 320px;
   order: 1;
   margin-inline: auto;
   padding: 0;
@@ -1346,12 +1346,9 @@ body.hero-video-open {
 .radio-option {
   --radio-control-size: 24px;
   display: grid;
-  grid-template-columns:
-    minmax(var(--radio-control-size), 1fr)
-    minmax(0, max-content)
-    minmax(var(--radio-control-size), 1fr);
+  grid-template-columns: var(--radio-control-size) minmax(0, 1fr);
   align-items: center;
-  column-gap: 8px;
+  column-gap: 12px;
   min-height: auto;
   padding: 0;
   margin: 0;
@@ -1362,7 +1359,7 @@ body.hero-video-open {
   font-family: "Neue Haas Unica", sans-serif;
   color: #462850;
   letter-spacing: 0.5px;
-  text-align: center;
+  text-align: left;
 }
 
 .reservation-form.materialize-scope .radio-option {
@@ -1392,7 +1389,7 @@ body.hero-video-open {
 }
 
 .radio-option input {
-  justify-self: end;
+  justify-self: start;
   cursor: pointer;
   width: var(--radio-control-size);
   height: var(--radio-control-size);
@@ -1410,7 +1407,7 @@ body.hero-video-open {
 .radio-option span {
   grid-column: 2;
   white-space: normal;
-  text-align: center;
+  text-align: left;
 }
 
 .date-pager {
