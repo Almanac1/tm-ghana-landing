@@ -175,7 +175,6 @@ def _send_submission_emails(submission: Submission) -> None:
             "session_type": session_type,
             "session_date": session_details["date"],
             "session_time": session_details["time"],
-            "meeting_link": session_details["meeting_link"],
         },
     )
 

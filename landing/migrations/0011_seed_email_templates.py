@@ -17,7 +17,7 @@ Your session details
 
 This will be a gentle introduction to Transcendental Meditation—an opportunity to learn more about the practice, how it works, and how it can become a simple part of your everyday life.
 
-We’ll send you the meeting details ({{ meeting_link }}) and a few helpful notes before your session.
+We’ll send you the meeting details and a few helpful notes before your session.
 
 We look forward to meeting you and sharing this experience with you.
 

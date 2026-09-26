@@ -145,7 +145,7 @@ class OnlineReservationFlowTests(TestCase):
     def test_reservation_without_session_type_is_saved_as_online_and_sends_emails(self):
         template = EmailTemplate.objects.get(slug=EmailTemplate.Slug.REGISTRATION_COMPLETE)
         template.subject = "Confirmation for {{ user_first_name }}"
-        template.body = "Hello {{ user_first_name }} — {{ session_time }} — {{ meeting_link }}"
+        template.body = "Hello {{ user_first_name }} — {{ session_time }}"
         template.save()
         self.complete_lead_form()
 
@@ -163,7 +163,7 @@ class OnlineReservationFlowTests(TestCase):
         self.assertIn("Session mode: Online Session", mail.outbox[0].body)
         self.assertIn("Hello Ada", mail.outbox[1].body)
         self.assertIn("6:00 PM", mail.outbox[1].body)
-        self.assertIn(self.meeting_settings.meeting_link, mail.outbox[1].body)
+        self.assertNotIn(self.meeting_settings.meeting_link, mail.outbox[1].body)
         self.assertIn(self.class_date.full_display_label, mail.outbox[0].body)
 
     def test_posted_physical_session_type_is_ignored(self):
