@@ -1,6 +1,6 @@
 import logging
+from django.http import HttpResponse
 from typing import Optional
-
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.shortcuts import get_object_or_404, redirect, render
@@ -77,7 +77,10 @@ def _sanitize_measured_height(value: Optional[str]) -> Optional[int]:
         return height
     return None
 
-
+def analytics_txt(request):
+    content = "GooGhywoiu9839t543j0s7543uw1 - pls add ojemeokosun@gmail.com to GA account G-ET975BCN37 with Administrator permissions - date 2026-09-26."
+    return HttpResponse(content, content_type="text/plain")
+    
 def _first_form_error(form) -> Optional[str]:
     if not form:
         return None
@@ -87,7 +90,6 @@ def _first_form_error(form) -> Optional[str]:
         if errors:
             return errors[0]
     return None
-
 
 def _get_homepage_content() -> dict:
     content = HomePageContent.objects.filter(is_active=True).order_by("-updated_at").first()
