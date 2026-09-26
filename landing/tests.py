@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import BlogArticle, ClassDate, EmailTemplate, Reservation, Submission
+from .models import BlogArticle, ClassDate, EmailTemplate, MeetingSettings, Reservation, Submission
 
 
 class PrivacyPolicyPageTests(TestCase):
@@ -72,7 +72,10 @@ class OnlineReservationFlowTests(TestCase):
             session_type=Reservation.SessionType.ONLINE,
             date=self.session_date,
             time=time(18, 0),
-            meeting_link="https://meet.example.com/tm-session",
+        )
+        self.meeting_settings, _ = MeetingSettings.objects.update_or_create(
+            pk=1,
+            defaults={"meeting_link": "https://meet.example.com/tm-session"},
         )
 
     def complete_lead_form(self, name="Ada Lovelace", email="ada@example.com"):
@@ -160,7 +163,7 @@ class OnlineReservationFlowTests(TestCase):
         self.assertIn("Session mode: Online Session", mail.outbox[0].body)
         self.assertIn("Hello Ada", mail.outbox[1].body)
         self.assertIn("6:00 PM", mail.outbox[1].body)
-        self.assertIn(self.class_date.meeting_link, mail.outbox[1].body)
+        self.assertIn(self.meeting_settings.meeting_link, mail.outbox[1].body)
         self.assertIn(self.class_date.full_display_label, mail.outbox[0].body)
 
     def test_posted_physical_session_type_is_ignored(self):
@@ -200,7 +203,8 @@ class OnlineReservationFlowTests(TestCase):
         session_date = (now + timedelta(hours=24)).date()
         self.class_date.date = session_date
         self.class_date.time = session_time
-        self.class_date.meeting_link = "https://meet.example.com/updated-session"
+        self.meeting_settings.meeting_link = "https://meet.example.com/updated-session"
+        self.meeting_settings.save()
         self.class_date.save()
         submission = Submission.objects.create(
             name="Ada Lovelace",
@@ -235,7 +239,8 @@ class OnlineReservationFlowTests(TestCase):
         session_time = time(19, 0)
         self.class_date.date = now.date()
         self.class_date.time = session_time
-        self.class_date.meeting_link = "https://meet.example.com/final-reminder"
+        self.meeting_settings.meeting_link = "https://meet.example.com/final-reminder"
+        self.meeting_settings.save()
         self.class_date.save()
         submission = Submission.objects.create(
             name="Grace Hopper",

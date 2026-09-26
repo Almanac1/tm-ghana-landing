@@ -10,6 +10,7 @@ from django.views.decorators.http import require_http_methods
 
 from .emailing import send_template_email
 from .forms import LeadCaptureForm, ReservationForm, get_active_class_date_options
+from .meeting_settings import get_meeting_link
 from .models import BlogArticle, ClassDate, EmailTemplate, HomePageContent, Reservation, Submission
 
 
@@ -118,9 +119,9 @@ def _get_session_details(session_date: str) -> dict[str, str]:
         return {
             "date": scheduled_date.date.strftime("%A, %B %-d, %Y"),
             "time": scheduled_date.time.strftime("%-I:%M %p"),
-            "meeting_link": scheduled_date.meeting_link,
+            "meeting_link": get_meeting_link(),
         }
-    return {"date": session_date, "time": "", "meeting_link": ""}
+    return {"date": session_date, "time": "", "meeting_link": get_meeting_link()}
 
 
 def _build_home_context(**overrides) -> dict:

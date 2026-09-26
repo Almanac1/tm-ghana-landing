@@ -1,6 +1,15 @@
 from django.contrib import admin
 
-from .models import BlogArticle, ClassDate, EmailTemplate, HomePageContent, LeadCapture, Reservation, Submission
+from .models import (
+    BlogArticle,
+    ClassDate,
+    EmailTemplate,
+    HomePageContent,
+    LeadCapture,
+    MeetingSettings,
+    Reservation,
+    Submission,
+)
 
 
 admin.site.site_header = "Meditation Landing Admin"
@@ -25,14 +34,14 @@ class LeadCaptureAdmin(admin.ModelAdmin):
 
 @admin.register(ClassDate)
 class ClassDateAdmin(admin.ModelAdmin):
-    list_display = ("date", "time", "meeting_link", "session_type", "is_active", "display_order")
+    list_display = ("date", "time", "session_type", "is_active", "display_order")
     list_editable = ("is_active", "display_order")
     list_filter = ("session_type", "is_active", "date")
     ordering = ("display_order", "date", "time")
     list_per_page = 25
 
     fieldsets = (
-        ("Class details", {"fields": ("session_type", "date", "time", "meeting_link")}),
+        ("Class details", {"fields": ("session_type", "date", "time")}),
         ("Display", {"fields": ("is_active", "display_order")}),
     )
 
@@ -75,6 +84,16 @@ class EmailTemplateAdmin(admin.ModelAdmin):
     search_fields = ("slug", "subject", "body")
     readonly_fields = ("updated_at",)
     fields = ("slug", "subject", "body", "updated_at")
+
+
+@admin.register(MeetingSettings)
+class MeetingSettingsAdmin(admin.ModelAdmin):
+    list_display = ("meeting_link", "updated_at")
+    readonly_fields = ("updated_at",)
+    fields = ("meeting_link", "updated_at")
+
+    def has_add_permission(self, request):
+        return not MeetingSettings.objects.exists()
 
 
 @admin.register(Reservation)

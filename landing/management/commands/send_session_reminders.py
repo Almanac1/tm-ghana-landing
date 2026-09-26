@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from landing.emailing import send_template_email
+from landing.meeting_settings import get_meeting_link
 from landing.models import ClassDate, EmailTemplate, Reservation, Submission
 
 
@@ -47,7 +48,8 @@ class Command(BaseCommand):
             reminder_at = scheduled_at - timedelta(hours=24)
             if not reminder_at <= now < reminder_at + window:
                 continue
-            if not class_date.meeting_link:
+            meeting_link = get_meeting_link()
+            if not meeting_link:
                 self.stderr.write(
                     self.style.WARNING(
                         f"Skipped {class_date.date} {class_date.time}: no meeting link is configured."
@@ -86,7 +88,7 @@ class Command(BaseCommand):
                     "user_first_name": _first_name(submission.name),
                     "session_date": class_date.date.strftime("%A, %B %-d, %Y"),
                     "session_time": class_date.time.strftime("%-I:%M %p"),
-                    "meeting_link": class_date.meeting_link,
+                    "meeting_link": get_meeting_link(),
                 },
             )
             submission.reminder_sent = True

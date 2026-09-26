@@ -10,10 +10,6 @@ class ClassDate(models.Model):
     session_type = models.CharField(max_length=12, choices=SessionType.choices, default=SessionType.ONLINE)
     date = models.DateField()
     time = models.TimeField()
-    meeting_link = models.URLField(
-        blank=True,
-        help_text="The online meeting URL included in the reservation confirmation email.",
-    )
     is_active = models.BooleanField(default=True)
     display_order = models.PositiveIntegerField(default=0)
 
@@ -103,6 +99,24 @@ class EmailTemplate(models.Model):
 
     def __str__(self) -> str:
         return self.get_slug_display()
+
+
+class MeetingSettings(models.Model):
+    """The single online meeting link shared by all scheduled sessions."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    meeting_link = models.URLField(
+        blank=True,
+        help_text="This link is included in every registration and reminder email.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Meeting settings"
+        verbose_name_plural = "Meeting settings"
+
+    def __str__(self) -> str:
+        return "Online meeting link"
 
 
 class LeadCapture(models.Model):
