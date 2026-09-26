@@ -107,19 +107,19 @@ def _get_homepage_content() -> dict:
     return content_data
 
 
-def _get_session_date_label(session_date: str) -> str:
-    for option in get_active_class_date_options():
-        if option["value"] == session_date:
-            return option["full_label"]
-
+def _get_session_details(session_date: str) -> dict[str, str]:
     scheduled_date = (
         ClassDate.objects.filter(session_type=Reservation.SessionType.ONLINE, date=session_date)
         .order_by("display_order", "time")
         .first()
     )
     if scheduled_date:
-        return scheduled_date.full_display_label
-    return session_date
+        return {
+            "date": scheduled_date.date.strftime("%A, %B %-d, %Y"),
+            "time": scheduled_date.time.strftime("%-I:%M %p"),
+            "meeting_link": scheduled_date.meeting_link,
+        }
+    return {"date": session_date, "time": "", "meeting_link": ""}
 
 
 def _build_home_context(**overrides) -> dict:
@@ -140,7 +140,7 @@ def _send_submission_emails(submission: Submission) -> None:
     admin_to = [settings.LANDING_ADMIN_EMAIL]
     first_name = _extract_first_name(submission.name)
     session_type = submission.get_session_type_display() if submission.session_type else "Not provided"
-    session_date = _get_session_date_label(submission.session_date)
+    session_details = _get_session_details(submission.session_date)
 
     admin_subject = f"New registration entry from {submission.name}"
     admin_body = render_to_string(
@@ -148,19 +148,23 @@ def _send_submission_emails(submission: Submission) -> None:
         {
             "submission": submission,
             "first_name": first_name,
+            "name": submission.name,
             "session_type": session_type,
-            "session_date": session_date,
+            "session_date": f"{session_details['date']} at {session_details['time']}".rstrip(" at "),
         },
     )
 
-    visitor_subject = "We received your meditation reservation"
+    visitor_subject = "Your Transcendental Meditation Session Reservation"
     visitor_body = render_to_string(
         "landing/emails/visitor_reservation_confirmation.txt",
         {
             "submission": submission,
-            "first_name": first_name,
+            "user_first_name": first_name,
+            "name": submission.name,
             "session_type": session_type,
-            "session_date": session_date,
+            "session_date": session_details["date"],
+            "session_time": session_details["time"],
+            "meeting_link": session_details["meeting_link"],
         },
     )
 

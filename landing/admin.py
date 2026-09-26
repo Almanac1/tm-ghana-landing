@@ -25,14 +25,14 @@ class LeadCaptureAdmin(admin.ModelAdmin):
 
 @admin.register(ClassDate)
 class ClassDateAdmin(admin.ModelAdmin):
-    list_display = ("date", "time", "session_type", "is_active", "display_order")
+    list_display = ("date", "time", "meeting_link", "session_type", "is_active", "display_order")
     list_editable = ("is_active", "display_order")
     list_filter = ("session_type", "is_active", "date")
     ordering = ("display_order", "date", "time")
     list_per_page = 25
 
     fieldsets = (
-        ("Class details", {"fields": ("session_type", "date", "time")}),
+        ("Class details", {"fields": ("session_type", "date", "time", "meeting_link")}),
         ("Display", {"fields": ("is_active", "display_order")}),
     )
 

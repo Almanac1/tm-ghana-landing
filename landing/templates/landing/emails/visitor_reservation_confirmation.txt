@@ -1,11 +1,19 @@
-Hi {{ first_name }},
+Hi {{ user_first_name }},
 
-Thank you for reserving your place with us. Your registration has been received.
+Thank you for reserving your place with us. ✨
 
-Selected session: {{ session_type }}
-Selected date: {{ session_date }}
+We’re delighted to welcome you to your introductory Transcendental Meditation session.
 
-We are looking forward to meditating with you and will follow up with the next steps shortly.
+Your session details
+🌿 Format: Online
+📅 Date: {{ session_date }}
+⏰ Time: {{ session_time }}
 
-Warm regards,
+This will be a gentle introduction to Transcendental Meditation—an opportunity to learn more about the practice, how it works, and how it can become a simple part of your everyday life.
+
+We’ll send you the meeting details ({{ meeting_link }}) and a few helpful notes before your session.
+
+We look forward to meeting you and sharing this experience with you.
+
+Warmly,
 Transcendental Meditation Team

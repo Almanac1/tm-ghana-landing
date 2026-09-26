@@ -71,6 +71,7 @@ class OnlineReservationFlowTests(TestCase):
             session_type=Reservation.SessionType.ONLINE,
             date=self.session_date,
             time=time(18, 0),
+            meeting_link="https://meet.example.com/tm-session",
         )
 
     def complete_lead_form(self, name="Ada Lovelace", email="ada@example.com"):
@@ -150,8 +151,12 @@ class OnlineReservationFlowTests(TestCase):
         self.assertEqual(submission.session_type, Reservation.SessionType.ONLINE)
         self.assertEqual(submission.session_date, self.session_date.isoformat())
         self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(mail.outbox[1].subject, "Your Transcendental Meditation Session Reservation")
         self.assertIn("Session mode: Online Session", mail.outbox[0].body)
-        self.assertIn("Selected session: Online Session", mail.outbox[1].body)
+        self.assertIn("🌿 Format: Online", mail.outbox[1].body)
+        self.assertIn("📅 Date: " + self.session_date.strftime("%A, %B %-d, %Y"), mail.outbox[1].body)
+        self.assertIn("⏰ Time: 6:00 PM", mail.outbox[1].body)
+        self.assertIn(self.class_date.meeting_link, mail.outbox[1].body)
         self.assertIn(self.class_date.full_display_label, mail.outbox[0].body)
 
     def test_posted_physical_session_type_is_ignored(self):

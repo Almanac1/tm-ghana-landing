@@ -10,6 +10,10 @@ class ClassDate(models.Model):
     session_type = models.CharField(max_length=12, choices=SessionType.choices, default=SessionType.ONLINE)
     date = models.DateField()
     time = models.TimeField()
+    meeting_link = models.URLField(
+        blank=True,
+        help_text="The online meeting URL included in the reservation confirmation email.",
+    )
     is_active = models.BooleanField(default=True)
     display_order = models.PositiveIntegerField(default=0)
 
