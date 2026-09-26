@@ -1,0 +1,18 @@
+Hi {{ user_first_name }}, 🌿
+
+A little reminder that your introductory Transcendental Meditation session begins in 1 hour.
+
+⏰ {{ session_time }}
+💻 Online
+
+Join here:
+{{ meeting_link }}
+
+Please find a quiet, comfortable space where you can relax and be present for the session. You may also have a notepad and pen close by to jot down anything you’d like to remember.
+
+Take a few moments to settle in before we begin.
+
+See you soon. ✨
+
+Warmly,
+Transcendental Meditation Team

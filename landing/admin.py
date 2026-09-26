@@ -100,6 +100,7 @@ class SubmissionAdmin(admin.ModelAdmin):
         "get_session_type_label",
         "get_session_date_label",
         "reminder_sent",
+        "reminder_1h_sent",
         "created_at",
     )
     search_fields = ("name", "email", "phone")
@@ -111,7 +112,7 @@ class SubmissionAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Contact details", {"fields": ("name", "email", "phone")}),
         ("Reservation details", {"fields": ("session_type", "session_date", "message")}),
-        ("Reminder", {"fields": ("reminder_sent",)}),
+        ("Reminders", {"fields": ("reminder_sent", "reminder_1h_sent")}),
         ("Metadata", {"fields": ("created_at",)}),
     )
 

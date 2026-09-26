@@ -131,6 +131,7 @@ class Submission(models.Model):
     session_date = models.CharField(max_length=10)
     message = models.TextField(blank=True)
     reminder_sent = models.BooleanField(default=False)
+    reminder_1h_sent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self) -> str:

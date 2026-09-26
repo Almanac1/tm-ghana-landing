@@ -222,3 +222,33 @@ class OnlineReservationFlowTests(TestCase):
         self.assertIn("📅 Wednesday, January 2, 2030", mail.outbox[0].body)
         self.assertIn("⏰ 7:00 PM", mail.outbox[0].body)
         self.assertIn("https://meet.example.com/updated-session", mail.outbox[0].body)
+
+    def test_one_hour_reminder_command_sends_once_with_current_meeting_link(self):
+        now = timezone.make_aware(datetime(2030, 1, 1, 18, 0))
+        session_time = time(19, 0)
+        self.class_date.date = now.date()
+        self.class_date.time = session_time
+        self.class_date.meeting_link = "https://meet.example.com/final-reminder"
+        self.class_date.save()
+        submission = Submission.objects.create(
+            name="Grace Hopper",
+            email="grace@example.com",
+            phone="8035550103",
+            session_type=Reservation.SessionType.ONLINE,
+            session_date=now.date().isoformat(),
+        )
+
+        with patch("landing.management.commands.send_session_1h_reminders.timezone.now", return_value=now):
+            call_command("send_session_1h_reminders")
+            call_command("send_session_1h_reminders")
+
+        submission.refresh_from_db()
+        self.assertTrue(submission.reminder_1h_sent)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            "Starting in 1 hour: Your Transcendental Meditation session 🌿",
+        )
+        self.assertIn("Hi Grace, 🌿", mail.outbox[0].body)
+        self.assertIn("⏰ 7:00 PM", mail.outbox[0].body)
+        self.assertIn("https://meet.example.com/final-reminder", mail.outbox[0].body)
