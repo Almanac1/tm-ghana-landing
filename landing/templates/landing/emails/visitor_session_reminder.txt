@@ -1,0 +1,19 @@
+Hi {{ user_first_name }}, 🌿
+
+Just a gentle reminder that your introductory Transcendental Meditation session is tomorrow.
+
+📅 {{ session_date }}
+⏰ {{ session_time }}
+💻 Online
+
+Join your session:
+{{ meeting_link }}
+
+We recommend joining a few minutes early so you can settle in comfortably before we begin.
+
+Come as you are. There’s nothing you need to prepare—just bring your curiosity and an open mind. ✨
+
+We look forward to welcoming you.
+
+Warmly,
+Transcendental Meditation Team

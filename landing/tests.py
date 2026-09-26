@@ -1,7 +1,8 @@
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 
 from django.core import mail
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -189,3 +190,35 @@ class OnlineReservationFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, f"{reverse('home')}#booking")
         self.assertEqual(Submission.objects.count(), 1)
+
+    def test_reminder_command_sends_one_dynamic_reminder_24_hours_before_session(self):
+        now = timezone.make_aware(datetime(2030, 1, 1, 19, 0))
+        session_time = time(19, 0)
+        session_date = (now + timedelta(hours=24)).date()
+        self.class_date.date = session_date
+        self.class_date.time = session_time
+        self.class_date.meeting_link = "https://meet.example.com/updated-session"
+        self.class_date.save()
+        submission = Submission.objects.create(
+            name="Ada Lovelace",
+            email="ada@example.com",
+            phone="8035550102",
+            session_type=Reservation.SessionType.ONLINE,
+            session_date=session_date.isoformat(),
+        )
+
+        with patch("landing.management.commands.send_session_reminders.timezone.now", return_value=now):
+            call_command("send_session_reminders")
+            call_command("send_session_reminders")
+
+        submission.refresh_from_db()
+        self.assertTrue(submission.reminder_sent)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            "Reminder: Your Transcendental Meditation session is tomorrow 🌿",
+        )
+        self.assertIn("Hi Ada, 🌿", mail.outbox[0].body)
+        self.assertIn("📅 Wednesday, January 2, 2030", mail.outbox[0].body)
+        self.assertIn("⏰ 7:00 PM", mail.outbox[0].body)
+        self.assertIn("https://meet.example.com/updated-session", mail.outbox[0].body)

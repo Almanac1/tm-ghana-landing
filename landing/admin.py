@@ -93,7 +93,15 @@ class ReservationAdmin(admin.ModelAdmin):
 
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin):
-    list_display = ("name", "email", "phone", "get_session_type_label", "get_session_date_label", "created_at")
+    list_display = (
+        "name",
+        "email",
+        "phone",
+        "get_session_type_label",
+        "get_session_date_label",
+        "reminder_sent",
+        "created_at",
+    )
     search_fields = ("name", "email", "phone")
     list_filter = ("session_type", "session_date", "created_at")
     ordering = ("-created_at",)
@@ -103,6 +111,7 @@ class SubmissionAdmin(admin.ModelAdmin):
     fieldsets = (
         ("Contact details", {"fields": ("name", "email", "phone")}),
         ("Reservation details", {"fields": ("session_type", "session_date", "message")}),
+        ("Reminder", {"fields": ("reminder_sent",)}),
         ("Metadata", {"fields": ("created_at",)}),
     )
 
