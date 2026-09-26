@@ -8,8 +8,9 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
+from .emailing import send_template_email
 from .forms import LeadCaptureForm, ReservationForm, get_active_class_date_options
-from .models import BlogArticle, ClassDate, HomePageContent, Reservation, Submission
+from .models import BlogArticle, ClassDate, EmailTemplate, HomePageContent, Reservation, Submission
 
 
 BENEFITS = [
@@ -154,20 +155,6 @@ def _send_submission_emails(submission: Submission) -> None:
         },
     )
 
-    visitor_subject = "Your Transcendental Meditation Session Reservation"
-    visitor_body = render_to_string(
-        "landing/emails/visitor_reservation_confirmation.txt",
-        {
-            "submission": submission,
-            "user_first_name": first_name,
-            "name": submission.name,
-            "session_type": session_type,
-            "session_date": session_details["date"],
-            "session_time": session_details["time"],
-            "meeting_link": session_details["meeting_link"],
-        },
-    )
-
     EmailMultiAlternatives(
         subject=admin_subject,
         body=admin_body,
@@ -176,12 +163,20 @@ def _send_submission_emails(submission: Submission) -> None:
         reply_to=[submission.email],
     ).send(fail_silently=False)
 
-    EmailMultiAlternatives(
-        subject=visitor_subject,
-        body=visitor_body,
-        from_email=from_email,
+    send_template_email(
+        slug=EmailTemplate.Slug.REGISTRATION_COMPLETE,
         to=[submission.email],
-    ).send(fail_silently=False)
+        context={
+            "submission": submission,
+            "user": submission,
+            "user_first_name": first_name,
+            "name": submission.name,
+            "session_type": session_type,
+            "session_date": session_details["date"],
+            "session_time": session_details["time"],
+            "meeting_link": session_details["meeting_link"],
+        },
+    )
 
 
 @require_http_methods(["GET", "POST"])

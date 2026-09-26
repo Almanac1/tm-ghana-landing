@@ -85,6 +85,26 @@ class HomePageContent(models.Model):
         return f"Homepage content updated {self.updated_at:%Y-%m-%d %H:%M}"
 
 
+class EmailTemplate(models.Model):
+    class Slug(models.TextChoices):
+        REGISTRATION_COMPLETE = "registration_complete", "Registration completion"
+        MEETING_REMINDER_24H = "meeting_reminder_24h", "24-hour meeting reminder"
+        MEETING_REMINDER_1H = "meeting_reminder_1h", "1-hour meeting reminder"
+
+    slug = models.SlugField(max_length=64, unique=True, choices=Slug.choices)
+    subject = models.CharField(max_length=255)
+    body = models.TextField(help_text="Django template syntax is supported, for example {{ user_first_name }}.")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("slug",)
+        verbose_name = "Email template"
+        verbose_name_plural = "Email templates"
+
+    def __str__(self) -> str:
+        return self.get_slug_display()
+
+
 class LeadCapture(models.Model):
     class Country(models.TextChoices):
         GHANA = "GH", "Ghana"

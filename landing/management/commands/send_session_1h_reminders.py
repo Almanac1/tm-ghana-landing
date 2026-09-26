@@ -1,16 +1,11 @@
 from datetime import datetime, timedelta
 
-from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.template.loader import render_to_string
 from django.utils import timezone
 
-from landing.models import ClassDate, Reservation, Submission
-
-
-REMINDER_SUBJECT = "Starting in 1 hour: Your Transcendental Meditation session 🌿"
+from landing.emailing import send_template_email
+from landing.models import ClassDate, EmailTemplate, Reservation, Submission
 
 
 def _first_name(name: str) -> str:
@@ -80,21 +75,19 @@ class Command(BaseCommand):
             if submission is None:
                 return False
 
-            body = render_to_string(
-                "landing/emails/visitor_session_1h_reminder.txt",
-                {
+            send_template_email(
+                slug=EmailTemplate.Slug.MEETING_REMINDER_1H,
+                to=[submission.email],
+                context={
+                    "submission": submission,
+                    "user": submission,
                     "name": submission.name,
                     "user_first_name": _first_name(submission.name),
+                    "session_date": class_date.date.strftime("%A, %B %-d, %Y"),
                     "session_time": class_date.time.strftime("%-I:%M %p"),
                     "meeting_link": class_date.meeting_link,
                 },
             )
-            EmailMultiAlternatives(
-                subject=REMINDER_SUBJECT,
-                body=body,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[submission.email],
-            ).send(fail_silently=False)
             submission.reminder_1h_sent = True
             submission.save(update_fields=["reminder_1h_sent"])
         return True

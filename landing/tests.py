@@ -7,7 +7,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import BlogArticle, ClassDate, Reservation, Submission
+from .models import BlogArticle, ClassDate, EmailTemplate, Reservation, Submission
 
 
 class PrivacyPolicyPageTests(TestCase):
@@ -140,6 +140,10 @@ class OnlineReservationFlowTests(TestCase):
             self.assertEqual(session_date.weekday(), 2)
 
     def test_reservation_without_session_type_is_saved_as_online_and_sends_emails(self):
+        template = EmailTemplate.objects.get(slug=EmailTemplate.Slug.REGISTRATION_COMPLETE)
+        template.subject = "Confirmation for {{ user_first_name }}"
+        template.body = "Hello {{ user_first_name }} — {{ session_time }} — {{ meeting_link }}"
+        template.save()
         self.complete_lead_form()
 
         response = self.reserve()
@@ -152,11 +156,10 @@ class OnlineReservationFlowTests(TestCase):
         self.assertEqual(submission.session_type, Reservation.SessionType.ONLINE)
         self.assertEqual(submission.session_date, self.session_date.isoformat())
         self.assertEqual(len(mail.outbox), 2)
-        self.assertEqual(mail.outbox[1].subject, "Your Transcendental Meditation Session Reservation")
+        self.assertEqual(mail.outbox[1].subject, "Confirmation for Ada")
         self.assertIn("Session mode: Online Session", mail.outbox[0].body)
-        self.assertIn("🌿 Format: Online", mail.outbox[1].body)
-        self.assertIn("📅 Date: " + self.session_date.strftime("%A, %B %-d, %Y"), mail.outbox[1].body)
-        self.assertIn("⏰ Time: 6:00 PM", mail.outbox[1].body)
+        self.assertIn("Hello Ada", mail.outbox[1].body)
+        self.assertIn("6:00 PM", mail.outbox[1].body)
         self.assertIn(self.class_date.meeting_link, mail.outbox[1].body)
         self.assertIn(self.class_date.full_display_label, mail.outbox[0].body)
 
@@ -206,6 +209,10 @@ class OnlineReservationFlowTests(TestCase):
             session_type=Reservation.SessionType.ONLINE,
             session_date=session_date.isoformat(),
         )
+        template = EmailTemplate.objects.get(slug=EmailTemplate.Slug.MEETING_REMINDER_24H)
+        template.subject = "24h reminder for {{ user_first_name }}"
+        template.body = "24h {{ user_first_name }} {{ session_date }} {{ session_time }} {{ meeting_link }}"
+        template.save()
 
         with patch("landing.management.commands.send_session_reminders.timezone.now", return_value=now):
             call_command("send_session_reminders")
@@ -216,11 +223,11 @@ class OnlineReservationFlowTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
             mail.outbox[0].subject,
-            "Reminder: Your Transcendental Meditation session is tomorrow 🌿",
+            "24h reminder for Ada",
         )
-        self.assertIn("Hi Ada, 🌿", mail.outbox[0].body)
-        self.assertIn("📅 Wednesday, January 2, 2030", mail.outbox[0].body)
-        self.assertIn("⏰ 7:00 PM", mail.outbox[0].body)
+        self.assertIn("24h Ada", mail.outbox[0].body)
+        self.assertIn("Wednesday, January 2, 2030", mail.outbox[0].body)
+        self.assertIn("7:00 PM", mail.outbox[0].body)
         self.assertIn("https://meet.example.com/updated-session", mail.outbox[0].body)
 
     def test_one_hour_reminder_command_sends_once_with_current_meeting_link(self):
@@ -237,6 +244,10 @@ class OnlineReservationFlowTests(TestCase):
             session_type=Reservation.SessionType.ONLINE,
             session_date=now.date().isoformat(),
         )
+        template = EmailTemplate.objects.get(slug=EmailTemplate.Slug.MEETING_REMINDER_1H)
+        template.subject = "1h reminder for {{ user_first_name }}"
+        template.body = "1h {{ user_first_name }} {{ session_time }} {{ meeting_link }}"
+        template.save()
 
         with patch("landing.management.commands.send_session_1h_reminders.timezone.now", return_value=now):
             call_command("send_session_1h_reminders")
@@ -247,8 +258,8 @@ class OnlineReservationFlowTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
             mail.outbox[0].subject,
-            "Starting in 1 hour: Your Transcendental Meditation session 🌿",
+            "1h reminder for Grace",
         )
-        self.assertIn("Hi Grace, 🌿", mail.outbox[0].body)
-        self.assertIn("⏰ 7:00 PM", mail.outbox[0].body)
+        self.assertIn("1h Grace", mail.outbox[0].body)
+        self.assertIn("7:00 PM", mail.outbox[0].body)
         self.assertIn("https://meet.example.com/final-reminder", mail.outbox[0].body)

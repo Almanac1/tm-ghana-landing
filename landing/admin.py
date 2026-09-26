@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BlogArticle, ClassDate, HomePageContent, LeadCapture, Reservation, Submission
+from .models import BlogArticle, ClassDate, EmailTemplate, HomePageContent, LeadCapture, Reservation, Submission
 
 
 admin.site.site_header = "Meditation Landing Admin"
@@ -67,6 +67,14 @@ class HomePageContentAdmin(admin.ModelAdmin):
         ("CTA", {"fields": ("cta_button_text", "cta_button_link")}),
         ("Status", {"fields": ("is_active", "updated_at")}),
     )
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ("slug", "subject", "updated_at")
+    search_fields = ("slug", "subject", "body")
+    readonly_fields = ("updated_at",)
+    fields = ("slug", "subject", "body", "updated_at")
 
 
 @admin.register(Reservation)
