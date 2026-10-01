@@ -274,31 +274,44 @@
     </div>
   </section>
 
-  <!-- Blogs Placeholder Section -->
   <section class="blogs-section" id="blogs">
     <div class="container">
-      {% if blog_articles %}
-        <div class="blogs-header">
-          <p class="blogs-kicker">Blogs</p>
-          <h2>Latest articles</h2>
+      <div class="blogs-header">
+        <p class="blogs-kicker">Blogs</p>
+        <h2>Latest articles</h2>
+      </div>
+      {% if carousel_articles %}
+      <div class="blog-carousel-shell">
+        <button type="button" class="blog-carousel-control blog-carousel-control-prev" aria-label="Previous articles">&#8249;</button>
+        <div class="blog-carousel-stage">
+          <div class="blog-carousel" id="blogCarousel">
+            {% for article in carousel_articles %}
+              <article class="blog-card blog-carousel-card">
+                <a class="blog-card-image-link" href="{{ article.get_absolute_url }}" aria-label="Read {{ article.title }}">
+                  {% if article.card_image %}
+                    <img class="blog-card-image" src="{{ article.card_image.url }}" alt="{{ article.card_image_alt }}">
+                  {% else %}
+                    <span class="blog-card-image-placeholder" aria-hidden="true"></span>
+                  {% endif %}
+                </a>
+                <div class="blog-card-content">
+                  <p class="blog-card-date">{{ article.publication_date|date:"F j, Y" }}</p>
+                  <h3><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h3>
+                  <p>{{ article.excerpt }}</p>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+          <div class="carousel-dots" id="blogCarouselDots" aria-label="Article carousel progress"></div>
         </div>
-        <div class="blogs-grid">
-          {% for article in blog_articles %}
-            <article class="blog-card">
-              <p class="blog-card-date">{{ article.created_at|date:"F j, Y" }}</p>
-              <h3><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h3>
-              <p>{{ article.excerpt }}</p>
-            </article>
-          {% endfor %}
-        </div>
-        <div class="blogs-actions">
-          <a class="blogs-link" href="{% url 'blog_list' %}">View all articles</a>
-        </div>
+        <button type="button" class="blog-carousel-control blog-carousel-control-next" aria-label="Next articles">&#8250;</button>
+      </div>
+      <div class="blogs-actions">
+        <a class="blogs-link" href="{% url 'blog_list' %}">View all articles</a>
+      </div>
       {% else %}
         <div class="blogs-placeholder-card">
-          <p class="blogs-kicker">Blogs</p>
-          <h2>Blogs coming soon</h2>
-          <p>We&rsquo;re preparing helpful articles on Transcendental Meditation, clarity, balance, and better living.</p>
+          <p>New articles are on the way. Please check back soon.</p>
         </div>
       {% endif %}
     </div>

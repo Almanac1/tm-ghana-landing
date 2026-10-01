@@ -58,6 +58,72 @@ class PrivacyPolicyPageTests(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 200)
 
 
+class BlogCarouselTests(TestCase):
+    def create_article(self, **overrides):
+        defaults = {
+            "title": "A calmer day",
+            "excerpt": "A short introduction.",
+            "body": "Article content.",
+            "is_published": True,
+            "publication_date": timezone.now() - timedelta(days=1),
+            "include_in_carousel": True,
+            "carousel_order": 0,
+        }
+        defaults.update(overrides)
+        return BlogArticle.objects.create(**defaults)
+
+    def test_homepage_carousel_uses_published_articles_in_admin_order(self):
+        second = self.create_article(
+            title="Second article",
+            slug="second-article",
+            carousel_order=2,
+        )
+        first = self.create_article(
+            title="First article",
+            slug="first-article",
+            carousel_order=1,
+            card_image="blog_cards/first-card.jpg",
+            image_alt="A peaceful sunrise",
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(list(response.context["carousel_articles"]), [first, second])
+        self.assertContains(response, first.get_absolute_url())
+        self.assertContains(response, second.get_absolute_url())
+        self.assertContains(response, "/media/blog_cards/first-card.jpg")
+        self.assertContains(response, 'alt="A peaceful sunrise"')
+
+    def test_drafts_future_and_non_carousel_articles_are_not_public(self):
+        draft = self.create_article(title="Draft", slug="draft", is_published=False)
+        future = self.create_article(
+            title="Future",
+            slug="future",
+            publication_date=timezone.now() + timedelta(days=1),
+        )
+        excluded = self.create_article(
+            title="Excluded",
+            slug="excluded",
+            include_in_carousel=False,
+        )
+
+        response = self.client.get(reverse("home"))
+        self.assertNotContains(response, draft.title)
+        self.assertNotContains(response, future.title)
+        self.assertNotContains(response, excluded.title)
+        self.assertEqual(self.client.get(draft.get_absolute_url()).status_code, 404)
+        self.assertEqual(self.client.get(future.get_absolute_url()).status_code, 404)
+        self.assertEqual(self.client.get(excluded.get_absolute_url()).status_code, 200)
+
+    def test_blog_section_shows_an_empty_state_when_no_articles_are_eligible_for_carousel(self):
+        self.create_article(include_in_carousel=False)
+
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, 'id="blogs"')
+        self.assertContains(response, "New articles are on the way")
+
+
 @override_settings(
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     DEFAULT_FROM_EMAIL="no-reply@test.local",

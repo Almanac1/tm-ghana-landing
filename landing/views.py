@@ -133,7 +133,9 @@ def _build_home_context(**overrides) -> dict:
         "faqs": FAQS,
         "homepage_content": _get_homepage_content(),
         "reservation_date_options": class_date_options,
-        "blog_articles": BlogArticle.objects.filter(is_published=True).order_by("-created_at")[:3],
+        "carousel_articles": BlogArticle.objects.public().filter(include_in_carousel=True).order_by(
+            "carousel_order", "-publication_date", "-created_at"
+        ),
     }
     context.update(overrides)
     return context
@@ -364,12 +366,12 @@ def home(request):
 
 
 def blog_list(request):
-    articles = BlogArticle.objects.filter(is_published=True).order_by("-created_at")
+    articles = BlogArticle.objects.public()
     return render(request, "landing/blog_list.html", {"articles": articles})
 
 
 def blog_detail(request, slug):
-    article = get_object_or_404(BlogArticle, slug=slug, is_published=True)
+    article = get_object_or_404(BlogArticle.objects.public(), slug=slug)
     return render(request, "landing/blog_detail.html", {"article": article})
 
 

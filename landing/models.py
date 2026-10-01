@@ -1,5 +1,6 @@
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import slugify
 
 
@@ -34,17 +35,29 @@ class ClassDate(models.Model):
         return f"{self.date.strftime('%A, %B %-d, %Y')} at {self.time.strftime('%-I:%M %p')}"
 
 
+class BlogArticleQuerySet(models.QuerySet):
+    def public(self):
+        return self.filter(is_published=True, publication_date__lte=timezone.now())
+
+
 class BlogArticle(models.Model):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
     excerpt = models.TextField()
     body = models.TextField()
+    card_image = models.ImageField(upload_to="blog_cards/", blank=True)
+    image_alt = models.CharField(max_length=255, blank=True)
     is_published = models.BooleanField(default=False)
+    publication_date = models.DateTimeField(default=timezone.now)
+    carousel_order = models.PositiveIntegerField(default=0)
+    include_in_carousel = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = BlogArticleQuerySet.as_manager()
+
     class Meta:
-        ordering = ("-created_at",)
+        ordering = ("-publication_date", "-created_at")
         verbose_name = "Blog article"
         verbose_name_plural = "Blog articles"
 
@@ -58,6 +71,10 @@ class BlogArticle(models.Model):
 
     def get_absolute_url(self) -> str:
         return reverse("blog_detail", kwargs={"slug": self.slug})
+
+    @property
+    def card_image_alt(self) -> str:
+        return self.image_alt or self.title
 
 
 class HomePageContent(models.Model):

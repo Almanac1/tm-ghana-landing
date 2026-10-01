@@ -958,6 +958,51 @@ if (testimonialsCarousel && prevTestimonialsBtn && nextTestimonialsBtn) {
   setActiveDot();
 }
 
+// Blog Carousel Controls
+const blogCarousel = document.getElementById('blogCarousel');
+const prevBlogBtn = document.querySelector('.blog-carousel-control-prev');
+const nextBlogBtn = document.querySelector('.blog-carousel-control-next');
+const blogDots = document.getElementById('blogCarouselDots');
+
+if (blogCarousel && prevBlogBtn && nextBlogBtn) {
+  const blogCards = Array.from(blogCarousel.querySelectorAll('.blog-carousel-card'));
+
+  const getBlogScrollAmount = () => {
+    const firstCard = blogCarousel.querySelector('.blog-carousel-card');
+    if (!firstCard) return 0;
+    const carouselStyles = window.getComputedStyle(blogCarousel);
+    const cardGap = parseFloat(carouselStyles.columnGap || carouselStyles.gap || 0);
+    return firstCard.getBoundingClientRect().width + cardGap;
+  };
+
+  const setActiveBlogDot = () => {
+    if (!blogDots) return;
+    const scrollAmount = getBlogScrollAmount();
+    const activeIndex = scrollAmount ? Math.round(blogCarousel.scrollLeft / scrollAmount) : 0;
+    blogDots.querySelectorAll('.carousel-dot').forEach((dot, index) => {
+      dot.classList.toggle('is-active', index === activeIndex);
+      dot.setAttribute('aria-current', index === activeIndex ? 'true' : 'false');
+    });
+  };
+
+  if (blogDots && blogCards.length) {
+    blogDots.innerHTML = blogCards.map((_, index) =>
+      `<button type="button" class="carousel-dot${index === 0 ? ' is-active' : ''}" data-index="${index}" aria-label="Go to article ${index + 1}" aria-current="${index === 0 ? 'true' : 'false'}"></button>`
+    ).join('');
+    blogDots.querySelectorAll('.carousel-dot').forEach(dot => {
+      dot.addEventListener('click', () => {
+        blogCarousel.scrollTo({ left: getBlogScrollAmount() * Number(dot.dataset.index || 0), behavior: 'smooth' });
+      });
+    });
+  }
+
+  prevBlogBtn.addEventListener('click', () => blogCarousel.scrollBy({ left: -getBlogScrollAmount(), behavior: 'smooth' }));
+  nextBlogBtn.addEventListener('click', () => blogCarousel.scrollBy({ left: getBlogScrollAmount(), behavior: 'smooth' }));
+  blogCarousel.addEventListener('scroll', setActiveBlogDot, { passive: true });
+  window.addEventListener('resize', setActiveBlogDot);
+  setActiveBlogDot();
+}
+
 // Add animation on scroll
 const observerOptions = {
   threshold: 0.1,

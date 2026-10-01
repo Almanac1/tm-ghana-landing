@@ -15,9 +15,16 @@
     <div class="blogs-grid blog-list-grid">
       {% for article in articles %}
         <article class="blog-card">
-          <p class="blog-card-date">{{ article.created_at|date:"F j, Y" }}</p>
-          <h2><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h2>
-          <p>{{ article.excerpt }}</p>
+          {% if article.card_image %}
+            <a class="blog-card-image-link" href="{{ article.get_absolute_url }}" aria-label="Read {{ article.title }}">
+              <img class="blog-card-image" src="{{ article.card_image.url }}" alt="{{ article.card_image_alt }}">
+            </a>
+          {% endif %}
+          <div class="blog-card-content">
+            <p class="blog-card-date">{{ article.publication_date|date:"F j, Y" }}</p>
+            <h2><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h2>
+            <p>{{ article.excerpt }}</p>
+          </div>
         </article>
       {% endfor %}
     </div>
