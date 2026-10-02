@@ -48,6 +48,17 @@ class ClassDateAdmin(admin.ModelAdmin):
 
 @admin.register(BlogArticle)
 class BlogArticleAdmin(admin.ModelAdmin):
+    class Media:
+        js = ("landing/admin_article_links.js",)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if "body" in form.base_fields:
+            form.base_fields["body"].help_text = (
+                "Select words and click Insert link. Links are stored as [link text](https://example.com)."
+            )
+        return form
+
     list_display = ("title", "author", "publication_date", "is_published", "include_in_carousel", "carousel_order", "updated_at")
     list_editable = ("is_published", "include_in_carousel", "carousel_order")
     list_filter = ("is_published", "include_in_carousel", "publication_date", "created_at", "updated_at")

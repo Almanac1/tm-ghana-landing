@@ -72,6 +72,27 @@ class BlogAuthorTests(TestCase):
             with self.subTest(url=url):
                 self.assertContains(self.client.get(url), "By Ada Okafor")
 
+    def test_article_links_render_with_paragraphs_and_escape_html(self):
+        self.article.body = (
+            'First paragraph.\n\n[schedule your introductory session](/#booking)\n'
+            '<script>alert(1)</script> [unsafe](javascript:alert)'
+        )
+        self.article.save()
+        response = self.client.get(self.article.get_absolute_url())
+        self.assertContains(response, '<p>First paragraph.</p>', html=True)
+        self.assertContains(response, '<a href="/#booking">schedule your introductory session</a>', html=True)
+        self.assertContains(response, '&lt;script&gt;alert(1)&lt;/script&gt;')
+        self.assertNotContains(response, 'href="javascript:')
+
+    def test_link_renderer_rejects_unsafe_urls_and_escapes_labels(self):
+        from .templatetags.article_content import article_content
+
+        for url in ('javascript:alert', 'data:text/html,test', '//example.com', '/\\example.com'):
+            with self.subTest(url=url):
+                self.assertNotIn('<a ', article_content(f'[label]({url})'))
+        self.assertIn('&lt;img', article_content('[<img src=x>](https://example.com)'))
+        self.assertIn('href="https://example.com"', article_content('[Example](https://example.com)'))
+
     def test_unassigned_articles_remain_public_without_empty_byline(self):
         self.article.author = ""
         self.article.save()

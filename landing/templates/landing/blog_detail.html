@@ -1,4 +1,5 @@
 {% extends "landing/base.html" %}
+{% load article_content %}
 
 {% block title %}{{ article.title }} - Transcendental Meditation Nigeria{% endblock %}
 {% block meta_description %}{{ article.excerpt|striptags|truncatechars:155 }}{% endblock %}
@@ -11,7 +12,7 @@
       <p class="blog-detail-meta">{% if article.author %}By {{ article.author }} &bull; {% endif %}<time datetime="{{ article.publication_date|date:'c' }}">{{ article.publication_date|date:"F j, Y" }}</time></p>
     </header>
     <div class="blog-detail-body">
-      {{ article.body|linebreaks }}
+      {{ article.body|article_content }}
     </div>
     <div class="blog-page-actions">
       <a class="blog-back-link" href="{% url 'blog_list' %}">Back to articles</a>

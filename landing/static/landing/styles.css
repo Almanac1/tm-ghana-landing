@@ -2119,6 +2119,23 @@ body.hero-video-open {
   margin: 0 0 1.2em;
 }
 
+.blog-detail-body a {
+  color: #462850;
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.blog-detail-body a:hover {
+  color: #875c24;
+}
+
+.blog-detail-body a:focus-visible {
+  outline: 2px solid #462850;
+  outline-offset: 3px;
+}
+
 .blogs-placeholder-card h2 {
   margin: 0 0 16px;
   color: #462850;
