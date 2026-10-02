@@ -1986,8 +1986,9 @@ body.hero-video-open {
   max-width: 100%;
   margin: 0 0 12px;
   color: #462850;
+  font-family: "Neue Haas Unica", sans-serif;
   font-size: clamp(1.2rem, 1rem + 0.55vw, 1.55rem);
-  font-weight: 400;
+  font-weight: 300;
   line-height: 1.25;
 }
 
@@ -2025,7 +2026,7 @@ body.hero-video-open {
   margin-bottom: 8px;
   color: #462850;
   font-size: clamp(1.3rem, 1.1rem + 0.5vw, 1.55rem);
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.3;
   overflow-wrap: anywhere;
 }
