@@ -2022,6 +2022,43 @@ body.hero-video-open {
   box-shadow: 0 8px 24px rgba(70, 40, 80, 0.06);
 }
 
+/* Soften article photo tones to sit alongside the testimonial photography. */
+.blog-carousel-card .blog-card-image {
+  filter: saturate(0.72) contrast(0.9) brightness(1.04);
+}
+
+.blog-carousel-card .blog-card-image-link {
+  position: relative;
+}
+
+.blog-carousel-card .blog-card-image-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 18, 24, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.blog-carousel-card .blog-card-image-link:hover::after,
+.blog-carousel-card .blog-card-image-link:focus-visible::after {
+  opacity: 1;
+}
+
+.blog-carousel-card .blog-card-image-link:focus-visible {
+  outline: 2px solid #462850;
+  outline-offset: -4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blog-carousel-card .blog-card-image-link::after,
+  .blog-carousel-card .blog-card-image-link .blog-card-image {
+    transition: none;
+    transform: none;
+  }
+}
+
 .blog-carousel-card h3 {
   margin-bottom: 8px;
   color: #462850;
