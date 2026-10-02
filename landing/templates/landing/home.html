@@ -296,11 +296,7 @@
                 </a>
                 <div class="blog-card-content">
                   <h3><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h3>
-                  {% if article.author %}
-                    <div class="blog-carousel-meta">
-                      <span class="blog-carousel-author">By {{ article.author }}</span>
-                    </div>
-                  {% endif %}
+                  {% include "landing/includes/article_meta.html" with article=article show_date=False only %}
                   <p class="blog-carousel-excerpt">{{ article.excerpt }}</p>
                 </div>
               </article>

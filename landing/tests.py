@@ -99,8 +99,7 @@ class BlogAuthorTests(TestCase):
         for url in (reverse("home"), reverse("blog_list"), self.article.get_absolute_url()):
             response = self.client.get(url)
             self.assertContains(response, self.article.title)
-            self.assertNotContains(response, 'class="blog-card-author"')
-            self.assertNotContains(response, 'class="blog-detail-meta">By ')
+            self.assertNotContains(response, 'class="article-meta-author"')
         self.assertContains(response, self.article.publication_date.strftime("%B %-d, %Y"))
 
     def test_public_pages_fetch_authors_without_extra_queries(self):
