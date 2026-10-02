@@ -295,9 +295,13 @@
                   {% endif %}
                 </a>
                 <div class="blog-card-content">
-                  <p class="blog-card-date">{{ article.publication_date|date:"F j, Y" }}</p>
                   <h3><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h3>
-                  <p>{{ article.excerpt }}</p>
+                  {% if article.author %}
+                    <div class="blog-carousel-meta">
+                      <span class="blog-carousel-author">By {{ article.author }}</span>
+                    </div>
+                  {% endif %}
+                  <p class="blog-carousel-excerpt">{{ article.excerpt }}</p>
                 </div>
               </article>
             {% endfor %}

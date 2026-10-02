@@ -2,6 +2,7 @@ from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 
 from django.core import mail
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -56,6 +57,61 @@ class PrivacyPolicyPageTests(TestCase):
         for url in (reverse("home"), reverse("blog_list"), article.get_absolute_url()):
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 200)
+
+
+class BlogAuthorTests(TestCase):
+    def setUp(self):
+        self.article = BlogArticle.objects.create(
+            title="A quiet moment", excerpt="An introduction.", body="Article content.",
+            author="Ada Okafor", is_published=True,
+            publication_date=timezone.now() - timedelta(days=1),
+        )
+
+    def test_author_names_on_all_public_pages(self):
+        for url in (reverse("home"), reverse("blog_list"), self.article.get_absolute_url()):
+            with self.subTest(url=url):
+                self.assertContains(self.client.get(url), "By Ada Okafor")
+
+    def test_unassigned_articles_remain_public_without_empty_byline(self):
+        self.article.author = ""
+        self.article.save()
+        for url in (reverse("home"), reverse("blog_list"), self.article.get_absolute_url()):
+            response = self.client.get(url)
+            self.assertContains(response, self.article.title)
+            self.assertNotContains(response, 'class="blog-card-author"')
+            self.assertNotContains(response, 'class="blog-detail-meta">By ')
+        self.assertContains(response, self.article.publication_date.strftime("%B %-d, %Y"))
+
+    def test_public_pages_fetch_authors_without_extra_queries(self):
+        BlogArticle.objects.create(
+            title="Another moment", author="Another Writer", is_published=True,
+            excerpt="Introduction", body="Content",
+        )
+        with self.assertNumQueries(1):
+            self.assertEqual(len([article.author for article in BlogArticle.objects.public()]), 2)
+        with self.assertNumQueries(1):
+            self.client.get(reverse("blog_list"))
+        with self.assertNumQueries(1):
+            self.client.get(self.article.get_absolute_url())
+
+    def test_admin_can_type_and_save_author(self):
+        admin_user = get_user_model().objects.create_superuser(
+            username="editor", email="editor@example.com", password="test-password"
+        )
+        self.client.force_login(admin_user)
+        response = self.client.get(reverse("admin:landing_blogarticle_add"))
+        self.assertEqual(response.context["adminform"].form.fields["author"].widget.input_type, "text")
+        url = reverse("admin:landing_blogarticle_change", args=[self.article.pk])
+        response = self.client.post(url, {
+            "title": self.article.title, "slug": self.article.slug,
+            "excerpt": self.article.excerpt, "body": self.article.body,
+            "author": "Independent Writer", "publication_date_0": "2026-10-02",
+            "publication_date_1": "12:00:00", "carousel_order": "0",
+        })
+        self.assertEqual(response.status_code, 302)
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.author, "Independent Writer")
+        self.assertContains(self.client.get(reverse("admin:landing_blogarticle_changelist")), "Independent Writer")
 
 
 class BlogCarouselTests(TestCase):

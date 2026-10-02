@@ -7,8 +7,8 @@
 <main class="blog-page">
   <article>
     <header class="blog-detail-header">
-      <p class="blog-detail-date">{{ article.publication_date|date:"F j, Y" }}</p>
       <h1 class="blog-detail-title">{{ article.title }}</h1>
+      <p class="blog-detail-meta">{% if article.author %}By {{ article.author }} &bull; {% endif %}<time datetime="{{ article.publication_date|date:'c' }}">{{ article.publication_date|date:"F j, Y" }}</time></p>
     </header>
     <div class="blog-detail-body">
       {{ article.body|linebreaks }}

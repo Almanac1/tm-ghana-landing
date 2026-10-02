@@ -48,7 +48,7 @@ class ClassDateAdmin(admin.ModelAdmin):
 
 @admin.register(BlogArticle)
 class BlogArticleAdmin(admin.ModelAdmin):
-    list_display = ("title", "publication_date", "is_published", "include_in_carousel", "carousel_order", "updated_at")
+    list_display = ("title", "author", "publication_date", "is_published", "include_in_carousel", "carousel_order", "updated_at")
     list_editable = ("is_published", "include_in_carousel", "carousel_order")
     list_filter = ("is_published", "include_in_carousel", "publication_date", "created_at", "updated_at")
     search_fields = ("title", "excerpt", "body")
@@ -59,7 +59,7 @@ class BlogArticleAdmin(admin.ModelAdmin):
     date_hierarchy = "publication_date"
 
     fieldsets = (
-        ("Article", {"fields": ("title", "slug", "excerpt", "body")}),
+        ("Article", {"fields": ("title", "slug", "author", "excerpt", "body")}),
         ("Carousel card", {"fields": ("card_image", "image_alt", "include_in_carousel", "carousel_order")}),
         ("Publishing", {"fields": ("is_published", "publication_date")}),
         ("Metadata", {"fields": ("created_at", "updated_at")}),

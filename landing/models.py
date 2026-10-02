@@ -42,6 +42,7 @@ class BlogArticleQuerySet(models.QuerySet):
 
 class BlogArticle(models.Model):
     title = models.CharField(max_length=200)
+    author = models.CharField(max_length=320, blank=True, default="")
     slug = models.SlugField(max_length=220, unique=True, blank=True)
     excerpt = models.TextField()
     body = models.TextField()
@@ -75,6 +76,7 @@ class BlogArticle(models.Model):
     @property
     def card_image_alt(self) -> str:
         return self.image_alt or self.title
+
 
 
 class HomePageContent(models.Model):

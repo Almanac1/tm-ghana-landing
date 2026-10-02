@@ -23,6 +23,7 @@
           <div class="blog-card-content">
             <p class="blog-card-date">{{ article.publication_date|date:"F j, Y" }}</p>
             <h2><a href="{{ article.get_absolute_url }}">{{ article.title }}</a></h2>
+            {% if article.author %}<p class="blog-card-author">By {{ article.author }}</p>{% endif %}
             <p>{{ article.excerpt }}</p>
           </div>
         </article>
