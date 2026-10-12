@@ -261,28 +261,48 @@ class OnlineReservationFlowTests(TestCase):
 
         response = self.client.get(reverse("home"))
 
-        self.assertEqual(len(response.context["reservation_date_options"]), 5)
+        self.assertEqual(len(response.context["reservation_date_options"]), 1)
         self.assertContains(response, "Reserve Your Spot")
         self.assertContains(response, "Select a Wednesday to join our online introductory session")
         self.assertContains(response, self.session_date.isoformat())
-        self.assertContains(response, (self.session_date + timedelta(weeks=1)).isoformat())
+        self.assertNotContains(response, (self.session_date + timedelta(weeks=1)).isoformat())
         self.assertNotContains(response, (self.session_date + timedelta(days=1)).isoformat())
         self.assertNotContains(response, (self.session_date - timedelta(weeks=2)).isoformat())
         self.assertNotContains(response, "Physical Session")
         self.assertNotContains(response, "reservation_session_mode_ui")
         self.assertNotContains(response, "reservation-session_type")
 
-    def test_fallback_dates_are_always_upcoming_wednesdays(self):
+    def test_no_dates_are_offered_when_admin_schedule_is_empty(self):
         self.class_date.delete()
 
         response = self.client.get(reverse("home"))
         options = response.context["reservation_date_options"]
 
-        self.assertEqual(len(options), 5)
-        for option in options:
-            session_date = date.fromisoformat(option["value"])
-            self.assertGreaterEqual(session_date, timezone.localdate())
-            self.assertEqual(session_date.weekday(), 2)
+        self.assertEqual(options, [])
+        self.assertContains(response, "No sessions are currently available")
+
+    def test_only_october_28_is_offered_when_other_dates_are_deleted(self):
+        ClassDate.objects.all().delete()
+        remaining = ClassDate.objects.create(date=date(2026, 10, 28), time=time(18, 0))
+        deleted = ClassDate.objects.create(date=date(2026, 10, 21), time=time(18, 0))
+        with patch("landing.forms.timezone.now", return_value=timezone.make_aware(datetime(2026, 10, 12, 12))):
+            self.assertEqual(len(self.client.get(reverse("home")).context["reservation_date_options"]), 2)
+            deleted.delete()
+            response = self.client.get(reverse("home"))
+            self.assertEqual([option["value"] for option in response.context["reservation_date_options"]], [remaining.value])
+            self.complete_lead_form()
+            rejected = self.reserve(**{"reservation-session_date": "2026-10-21"})
+            self.assertEqual(rejected.status_code, 200)
+            self.assertFalse(Submission.objects.exists())
+            accepted = self.reserve(**{"reservation-session_date": remaining.value})
+            self.assertEqual(accepted.status_code, 302)
+            self.assertEqual(Submission.objects.get().session_date, remaining.value)
+
+    def test_inactive_date_is_not_offered(self):
+        self.class_date.is_active = False
+        self.class_date.save()
+        response = self.client.get(reverse("home"))
+        self.assertEqual(response.context["reservation_date_options"], [])
 
     def test_reservation_without_session_type_is_saved_as_online_and_sends_emails(self):
         template = EmailTemplate.objects.get(slug=EmailTemplate.Slug.REGISTRATION_COMPLETE)

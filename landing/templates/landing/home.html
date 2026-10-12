@@ -203,6 +203,9 @@
                 {% if not lead_details_completed %}aria-disabled="true"{% endif %}>
               </div>
               {{ reservation_date_options|json_script:"reservationDateOptionsData" }}
+              {% if not reservation_date_options %}
+                <p role="status">No sessions are currently available. Please check back soon.</p>
+              {% endif %}
             </div>
 
             <!-- Submit Button -->

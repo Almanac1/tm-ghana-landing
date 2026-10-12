@@ -8,5 +8,4 @@ urlpatterns = [
     path("blog/", blog_list, name="blog_list"),
     path("blog/<slug:slug>/", blog_detail, name="blog_detail"),
     path("analytics.txt", analytics_txt, name="analytics_txt"),
-
 ]

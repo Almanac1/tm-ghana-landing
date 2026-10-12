@@ -1,27 +1,7 @@
-from datetime import timedelta
-
 from django import forms
 from django.utils import timezone
 
 from .models import ClassDate, LeadCapture, Reservation
-
-
-FALLBACK_SESSION_COUNT = 5
-
-
-def _date_option(session_date):
-    return {
-        "value": session_date.isoformat(),
-        "label": session_date.strftime("%A, %B %-d"),
-        "full_label": session_date.strftime("%A, %B %-d, %Y"),
-    }
-
-
-def _next_wednesday_options(count=FALLBACK_SESSION_COUNT):
-    today = timezone.localdate()
-    days_until_wednesday = (2 - today.weekday()) % 7
-    first_wednesday = today + timedelta(days=days_until_wednesday)
-    return [_date_option(first_wednesday + timedelta(weeks=index)) for index in range(count)]
 
 
 def get_active_class_date_options():
@@ -33,7 +13,7 @@ def get_active_class_date_options():
         date__gte=today,
     ).order_by("display_order", "date", "time")
 
-    options_by_date = {option["value"]: option for option in _next_wednesday_options()}
+    options_by_date = {}
     for class_date in class_dates:
         if class_date.date.weekday() != 2:
             continue
@@ -90,7 +70,9 @@ class ReservationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         is_locked = kwargs.pop("is_locked", False)
-        class_date_options = kwargs.pop("class_date_options", None) or get_active_class_date_options()
+        class_date_options = kwargs.pop("class_date_options", None)
+        if class_date_options is None:
+            class_date_options = get_active_class_date_options()
         super().__init__(*args, **kwargs)
         self.class_date_options = class_date_options
         self.fields["session_date"].choices = [

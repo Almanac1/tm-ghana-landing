@@ -127,7 +127,9 @@ def _get_session_details(session_date: str) -> dict[str, str]:
 
 
 def _build_home_context(**overrides) -> dict:
-    class_date_options = overrides.pop("class_date_options", None) or get_active_class_date_options()
+    class_date_options = overrides.pop("class_date_options", None)
+    if class_date_options is None:
+        class_date_options = get_active_class_date_options()
     context = {
         "benefits": BENEFITS,
         "faqs": FAQS,
