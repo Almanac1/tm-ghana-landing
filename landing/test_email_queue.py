@@ -19,6 +19,13 @@ from .models import ClassDate, EmailTemplate, MeetingSettings, Reservation, Sche
                    DEFAULT_FROM_EMAIL="sender@example.com", LANDING_ADMIN_EMAIL="admin@example.com")
 class EmailQueueTests(TestCase):
     def setUp(self):
+        publisher = patch("landing.tasks.send_scheduled_email.delay", side_effect=lambda pk: process_due(job_id=pk, record_heartbeat=False))
+        publisher.start()
+        self.addCleanup(publisher.stop)
+        from .tasks import dispatch_due_emails
+        dispatcher = patch("landing.tasks.dispatch_due_emails.delay", side_effect=dispatch_due_emails.run)
+        dispatcher.start()
+        self.addCleanup(dispatcher.stop)
         self.now = datetime(2030, 1, 1, 12, tzinfo=dt_timezone.utc)
         self.clock = patch("django.utils.timezone.now", return_value=self.now)
         self.clock.start()
@@ -34,7 +41,7 @@ class EmailQueueTests(TestCase):
             return book(session_date="2030-01-02", name="Ada Okafor", email=email, phone="8035550102")
 
     def job(self, kind=CONFIRMATION):
-        return ScheduledEmail.objects.get(kind=kind)
+        return ScheduledEmail.objects.filter(kind=kind).order_by("-pk").first()
 
     def test_confirmation_admin_and_both_reminders_use_admin_templates(self):
         for kind in EmailTemplate.Slug.values:
@@ -84,7 +91,7 @@ class EmailQueueTests(TestCase):
         self.assertEqual(ScheduledEmail.objects.count(), 4)
         process_due(now=self.session.starts_at-timedelta(minutes=30))
         process_due(now=self.session.starts_at-timedelta(minutes=30))
-        self.assertEqual(len(mail.outbox), 4)
+        self.assertEqual(len(mail.outbox), 2)
 
     def test_late_registrations_only_queue_future_reminders(self):
         for remaining, expected in [(25, 2), (24, 1), (2, 1), (1, 0), (0.5, 0)]:
@@ -233,18 +240,19 @@ class EmailQueueTests(TestCase):
 
     def test_worker_restart_uses_persisted_queue_and_catches_up_across_midnight(self):
         self.register()
-        # No window: a delayed worker recovers all due messages before session start.
+        # Pending records survive restarts; only reminders within grace are sent.
         call_command("process_email_queue", stdout=StringIO())
         with patch("django.utils.timezone.now", return_value=self.session.starts_at-timedelta(minutes=30)):
             call_command("process_email_queue", stdout=StringIO())
             call_command("process_email_queue", stdout=StringIO())
-        self.assertEqual(len(mail.outbox), 4)
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(ScheduledEmail.objects.filter(status="expired").count(), 2)
 
     def test_never_sends_reminders_after_session_starts(self):
         self.register()
         process_due(now=self.session.starts_at)
         self.assertEqual(len(mail.outbox), 2)
-        self.assertEqual(ScheduledEmail.objects.filter(status="cancelled").count(), 2)
+        self.assertEqual(ScheduledEmail.objects.filter(status="expired").count(), 2)
 
     def test_missing_link_records_error_and_can_retry_after_configuration(self):
         self.register()
@@ -261,6 +269,7 @@ class EmailQueueTests(TestCase):
         with self.assertRaises(CommandError):
             call_command("email_queue_status", stdout=StringIO())
         process_due(now=self.now)
+        EmailWorkerHeartbeat.objects.create(name="email_scheduler", last_seen_at=self.now)
         call_command("email_queue_status", stdout=StringIO())
         with patch("django.utils.timezone.now", return_value=self.now+timedelta(minutes=3)):
             with self.assertRaises(CommandError):
@@ -274,7 +283,7 @@ class EmailQueueTests(TestCase):
         call_command("enroll_legacy_reminders", apply=True, stdout=StringIO())
         self.assertEqual(sub.scheduled_emails.get(kind=CONFIRMATION).status, "skipped")
         self.assertEqual(sub.scheduled_emails.get(kind="meeting_reminder_24h").status, "skipped")
-        process_due(now=self.session.starts_at-timedelta(minutes=30))
+        process_due(now=self.session.starts_at-timedelta(hours=1))
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [sub.email])
 
@@ -305,3 +314,138 @@ class EmailQueueTests(TestCase):
         self.assertEqual(sub.scheduled_emails.filter(status="pending").count(), 2)  # future reminders are not due yet
         process_due(now=self.session.starts_at-timedelta(minutes=30))
         self.assertEqual(sub.scheduled_emails.filter(status="cancelled").count(), 4)
+
+    def test_broker_failure_keeps_committed_records_and_beat_recovers(self):
+        from .tasks import dispatch_due_emails, send_scheduled_email
+        with patch.object(send_scheduled_email, "delay", side_effect=ConnectionError("broker down")):
+            with self.assertLogs("landing.email_queue", level="ERROR"):
+                sub = self.register()
+        self.assertEqual(sub.scheduled_emails.filter(status="pending").count(), 4)
+        self.assertEqual(mail.outbox, [])
+        dispatch_due_emails()
+        self.assertEqual(sub.scheduled_emails.filter(status="sent").count(), 2)
+        dispatch_due_emails()
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_model_creation_also_enqueues_after_commit(self):
+        from .tasks import send_scheduled_email
+        with patch.object(send_scheduled_email, "delay") as publish:
+            with self.captureOnCommitCallbacks(execute=True):
+                with transaction.atomic():
+                    sub = Submission.objects.create(name="Direct", email="direct@example.com", phone="123", class_date=self.session)
+                    self.assertEqual(sub.scheduled_emails.count(), 4)
+                    publish.assert_not_called()
+            self.assertEqual(publish.call_count, 2)
+        self.assertEqual(mail.outbox, [])
+
+    def test_unique_registration_occurrence_kind_constraint(self):
+        from django.db import IntegrityError
+        sub = self.register(immediate=False)
+        job = self.job()
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ScheduledEmail.objects.create(submission=sub, occurrence=self.session, kind=CONFIRMATION,
+                scheduled_at=self.now, next_attempt_at=self.now, session_at=job.session_at)
+
+    def test_latest_template_and_all_compatible_placeholders(self):
+        self.register(immediate=False)
+        EmailTemplate.objects.filter(slug=CONFIRMATION).update(subject="Updated {{ name }}", body=
+            "{{ user_first_name }}|{{ first_name }}|{{ user.name }}|{{ submission.name }}|{{ session_date }}|{{ session_time }}|{{ timezone }}|{{ meeting_link }}")
+        process_due(kinds=[CONFIRMATION])
+        self.assertEqual(mail.outbox[0].subject, "Updated Ada Okafor")
+        self.assertIn("Ada|Ada|Ada Okafor|Ada Okafor|Wednesday, January 2, 2030|6:00 PM WAT (Africa/Lagos)|Africa/Lagos|https://example.com/meeting", mail.outbox[0].body)
+        self.assertEqual(self.job().provider_accepted_at, self.now)
+        self.assertEqual(self.job().last_attempt_at, self.now)
+
+    def test_five_minute_grace_boundary(self):
+        for seconds, expected in [(0, "sent"), (300, "sent"), (301, "expired")]:
+            sub = self.register(email=f"grace{seconds}@example.com", immediate=False)
+            job = sub.scheduled_emails.get(kind="meeting_reminder_1h")
+            process_due(job_id=job.pk, now=job.scheduled_at+timedelta(seconds=seconds))
+            job.refresh_from_db()
+            self.assertEqual(job.status, expected)
+
+    def test_restart_recovers_due_reminder_inside_grace(self):
+        from .tasks import dispatch_due_emails
+        sub = self.register()
+        due = sub.scheduled_emails.get(kind="meeting_reminder_24h").scheduled_at
+        with patch("django.utils.timezone.now", return_value=due+timedelta(minutes=2)):
+            dispatch_due_emails()
+            dispatch_due_emails()
+        self.assertEqual(len(mail.outbox), 3)
+
+    def test_bulk_reschedule_is_rechecked_before_transport(self):
+        self.register(immediate=False)
+        job = self.job("meeting_reminder_24h")
+        ClassDate.objects.filter(pk=self.session.pk).update(date="2030-01-09")
+        process_due(job_id=job.pk, now=job.scheduled_at)
+        job.refresh_from_db()
+        self.assertEqual(job.status, "pending")
+        self.assertEqual(job.scheduled_at.date().isoformat(), "2030-01-08")
+        self.assertEqual(mail.outbox, [])
+
+    def test_missing_template_error_is_saved_without_fallback(self):
+        self.register(immediate=False)
+        EmailTemplate.objects.filter(slug=CONFIRMATION).delete()
+        process_due(kinds=[CONFIRMATION])
+        self.assertEqual(self.job().status, "failed")
+        self.assertIn("registration_complete", self.job().error)
+        self.assertIn("missing", self.job().error)
+        self.assertIsNone(self.job().provider_accepted_at)
+        self.assertEqual(mail.outbox, [])
+
+    def test_scheduler_heartbeat_does_not_masquerade_as_worker(self):
+        from landing.scheduler import MonitoredScheduler
+        from celery.beat import PersistentScheduler
+        with patch.object(PersistentScheduler, "tick", return_value=30):
+            self.assertEqual(MonitoredScheduler.tick(object.__new__(MonitoredScheduler)), 30)
+        self.assertTrue(EmailWorkerHeartbeat.objects.filter(pk="email_scheduler").exists())
+        self.assertFalse(EmailWorkerHeartbeat.objects.filter(pk="email_worker").exists())
+        with self.assertRaisesMessage(CommandError, "email_worker"):
+            call_command("email_queue_status", stdout=StringIO())
+
+    def test_celery_task_claims_one_record_and_redelivery_is_safe(self):
+        from landing.tasks import send_scheduled_email
+        self.register(immediate=False)
+        job = self.job()
+        self.assertEqual(send_scheduled_email.apply(args=[job.pk]).get(), 1)
+        self.assertEqual(send_scheduled_email.apply(args=[job.pk]).get(), 0)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_expired_reminder_is_recalculated_after_reschedule(self):
+        self.register()
+        process_due(now=self.session.starts_at-timedelta(minutes=30))
+        self.assertEqual(self.job("meeting_reminder_1h").status, "expired")
+        self.session.date += timedelta(days=7)
+        self.session.save()
+        self.assertEqual(self.job("meeting_reminder_1h").status, "pending")
+        self.assertEqual(self.job("meeting_reminder_1h").scheduled_at, self.session.starts_at-timedelta(hours=1))
+
+    def test_invalid_early_deadline_is_corrected_without_send(self):
+        sub = self.register(immediate=False)
+        job = sub.scheduled_emails.get(kind="meeting_reminder_1h")
+        ScheduledEmail.objects.filter(pk=job.pk).update(scheduled_at=self.now, next_attempt_at=self.now)
+        process_due(job_id=job.pk)
+        job.refresh_from_db()
+        self.assertEqual(job.status, "pending")
+        self.assertEqual(job.attempts, 0)
+        self.assertEqual(job.next_attempt_at, self.session.starts_at-timedelta(hours=1))
+        self.assertEqual(mail.outbox, [])
+
+    def test_latest_recipient_is_recorded_when_transport_accepts(self):
+        sub = self.register(immediate=False)
+        Submission.objects.filter(pk=sub.pk).update(email="new-address@example.com")
+        process_due(kinds=[CONFIRMATION])
+        self.assertEqual(self.job().recipient, "new-address@example.com")
+        self.assertEqual(mail.outbox[0].to, ["new-address@example.com"])
+
+    def test_pending_confirmation_follows_registration_moved_to_other_occurrence(self):
+        sub = self.register(immediate=False)
+        other = ClassDate.objects.create(date="2030-01-09", time="20:00")
+        other.refresh_from_db()
+        sub.class_date = other
+        sub.save()
+        self.assertEqual(sub.scheduled_emails.filter(kind=CONFIRMATION).count(), 1)
+        self.assertEqual(self.job().occurrence_id, other.pk)
+        process_due(kinds=[CONFIRMATION])
+        self.assertEqual(self.job().status, "sent")
+        self.assertIn("January 9, 2030", mail.outbox[0].body)

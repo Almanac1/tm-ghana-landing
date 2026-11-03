@@ -1,25 +1,17 @@
-import time
 from django.core.management.base import BaseCommand, CommandError
-from django.db import close_old_connections
-from landing.email_queue import process_due
+from landing.tasks import dispatch_due_emails
 
 
 class Command(BaseCommand):
-    help = "Process durable email outbox once, or poll in a PythonAnywhere Always-on task."
+    help = "Ask Celery to dispatch due outbox records once. Run Celery Beat for continuous scheduling."
 
     def add_arguments(self, parser):
-        parser.add_argument("--loop", action="store_true")
-        parser.add_argument("--interval", type=int, default=30)
-        parser.add_argument("--limit", type=int, default=100)
+        parser.add_argument("--loop", action="store_true", help="Removed; use Celery Beat")
+        parser.add_argument("--interval", type=int, default=30, help="Deprecated")
+        parser.add_argument("--limit", type=int, default=100, help="Deprecated")
 
     def handle(self, *args, **options):
-        if options["interval"] < 1 or options["limit"] < 1:
-            raise CommandError("interval and limit must be positive")
-        while True:
-            close_old_connections()
-            count = process_due(limit=options["limit"])
-            self.stdout.write(f"Email queue checked; sent={count}")
-            self.stdout.flush()
-            if not options["loop"]:
-                return
-            time.sleep(options["interval"])
+        if options["loop"]:
+            raise CommandError("Standalone polling removed. Run a Celery worker and one Celery Beat scheduler.")
+        dispatch_due_emails.delay()
+        self.stdout.write("Requested Celery dispatch; inspect Scheduled emails for provider acceptance.")

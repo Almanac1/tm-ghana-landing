@@ -31,7 +31,7 @@ class Command(BaseCommand):
                     for kind in [ADMIN, CONFIRMATION, *REMINDERS]:
                         already_sent = (kind == "meeting_reminder_24h" and submission.reminder_sent) or (kind == "meeting_reminder_1h" and submission.reminder_1h_sent)
                         if kind in [ADMIN, CONFIRMATION] or already_sent:
-                            ScheduledEmail.objects.get_or_create(submission=submission, kind=kind, defaults={
+                            ScheduledEmail.objects.get_or_create(submission=submission, occurrence=session, kind=kind, defaults={
                                 "scheduled_at": submission.created_at, "next_attempt_at": submission.created_at,
                                 "session_at": session.starts_at, "status": "skipped",
                                 "error": "Historical notification; delivery unknown, deliberately not replayed",

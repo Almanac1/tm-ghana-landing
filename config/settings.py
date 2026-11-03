@@ -156,13 +156,32 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Namecheap Private Email SMTP
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = os.getenv("EMAIL_HOST", "mail.privateemail.com")
-EMAIL_PORT = 465
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = True
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465"))
+EMAIL_USE_TLS = env_config("EMAIL_USE_TLS", default=False, cast=bool)
+EMAIL_USE_SSL = env_config("EMAIL_USE_SSL", default=True, cast=bool)
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-EMAIL_TIMEOUT = 20
+EMAIL_TIMEOUT = int(os.getenv("EMAIL_TIMEOUT", "20"))
+EMAIL_FILE_PATH = os.getenv("EMAIL_FILE_PATH", str(BASE_DIR / "test-emails"))
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 SERVER_EMAIL = env_config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
 LANDING_ADMIN_EMAIL = env_config("LANDING_ADMIN_EMAIL", default=DEFAULT_FROM_EMAIL)
 PRIVACY_CONTACT_EMAIL = env_config("PRIVACY_CONTACT_EMAIL", default=DEFAULT_FROM_EMAIL)
+
+# The database outbox owns deadlines and retries; broker messages carry only IDs.
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_TIMEZONE = "UTC"
+CELERY_ENABLE_UTC = True
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_PUBLISH_RETRY = False
+CELERY_BROKER_CONNECTION_TIMEOUT = 3
+CELERY_BROKER_TRANSPORT_OPTIONS = {"socket_connect_timeout": 3, "socket_timeout": 3}
+CELERY_BEAT_SCHEDULER = "landing.scheduler.MonitoredScheduler"
+CELERY_BEAT_MAX_LOOP_INTERVAL = 30
+CELERY_BEAT_SCHEDULE = {
+    "dispatch-database-emails": {"task": "landing.tasks.dispatch_due_emails", "schedule": 30.0},
+}

@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 
@@ -12,6 +13,9 @@ def submission_changed(sender, instance, raw=False, created=False, **kwargs):
             Reservation.objects.filter(pk=instance.reservation_id).update(
                 session_date=instance.session_date, session_type=instance.session_type)
         reconcile(instance, include_registration=created)
+        if created:
+            from .email_queue import deliver_immediate_safely
+            transaction.on_commit(lambda pk=instance.pk: deliver_immediate_safely(pk))
 
 
 @receiver(post_save, sender=ClassDate)

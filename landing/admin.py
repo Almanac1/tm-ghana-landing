@@ -182,7 +182,8 @@ class SubmissionAdmin(admin.ModelAdmin):
 
 @admin.register(ScheduledEmail)
 class ScheduledEmailAdmin(admin.ModelAdmin):
-    list_display = ("submission", "kind", "scheduled_at", "status", "sent_at", "attempts", "error")
+    list_display = ("submission", "recipient", "kind", "scheduled_at", "status", "sent_at", "attempts", "error")
+    list_select_related = ("submission",)
     list_filter = ("status", "kind", "scheduled_at")
     search_fields = ("submission__email", "submission__name", "error", "message_id")
     readonly_fields = tuple(field.name for field in ScheduledEmail._meta.fields)
@@ -196,7 +197,13 @@ class ScheduledEmailAdmin(admin.ModelAdmin):
 
 @admin.register(EmailWorkerHeartbeat)
 class EmailWorkerHeartbeatAdmin(admin.ModelAdmin):
-    list_display = ("name", "last_seen_at")
+    list_display = ("name", "last_seen_at", "is_stale")
+
+    @admin.display(boolean=True, description="Stale (>120 seconds)")
+    def is_stale(self, obj):
+        from datetime import timedelta
+        from django.utils import timezone
+        return obj.last_seen_at < timezone.now() - timedelta(seconds=120)
     readonly_fields = ("name", "last_seen_at")
 
     def has_add_permission(self, request):

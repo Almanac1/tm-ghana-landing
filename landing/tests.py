@@ -207,6 +207,10 @@ class BlogCarouselTests(TestCase):
 )
 class OnlineReservationFlowTests(TestCase):
     def setUp(self):
+        from .email_queue import process_due
+        publisher = patch("landing.tasks.send_scheduled_email.delay", side_effect=lambda pk: process_due(job_id=pk, record_heartbeat=False))
+        publisher.start()
+        self.addCleanup(publisher.stop)
         today = timezone.localdate()
         days_until_wednesday = (2 - today.weekday()) % 7
         self.session_date = today + timedelta(days=days_until_wednesday)

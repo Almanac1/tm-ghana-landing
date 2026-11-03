@@ -230,10 +230,15 @@ class ScheduledEmail(models.Model):
         SENDING = "sending", "Sending"
         SENT = "sent", "Sent (SMTP accepted)"
         FAILED = "failed", "Failed"
-        CANCELLED = "cancelled", "Cancelled / expired"
+        CANCELLED = "cancelled", "Cancelled"
+        EXPIRED = "expired", "Expired reminder"
         UNCERTAIN = "uncertain", "Uncertain — review provider logs"
 
     submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name="scheduled_emails")
+    occurrence = models.ForeignKey(ClassDate, null=True, on_delete=models.SET_NULL, editable=False)
+    recipient = models.EmailField(blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    provider_accepted_at = models.DateTimeField(null=True, blank=True)
     kind = models.CharField(max_length=64, choices=[*EmailTemplate.Slug.choices, ("admin_notification", "Administrator alert")])
     scheduled_at = models.DateTimeField()
     next_attempt_at = models.DateTimeField()
@@ -246,7 +251,7 @@ class ScheduledEmail(models.Model):
     message_id = models.CharField(max_length=255, blank=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["submission", "kind"], name="unique_submission_email_kind")]
+        constraints = [models.UniqueConstraint(fields=["submission", "occurrence", "kind"], name="unique_registration_occurrence_email")]
         indexes = [models.Index(fields=["status", "next_attempt_at"], name="email_due_idx")]
 
 

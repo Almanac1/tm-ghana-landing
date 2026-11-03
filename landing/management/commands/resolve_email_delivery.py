@@ -24,7 +24,7 @@ class Command(BaseCommand):
                 error=f"Manual retry authorized: {options['note']}; previous error: {job.error}"[:2000])
         else:
             changed = ScheduledEmail.objects.filter(pk=job.pk, status=job.status).update(
-                status="sent", sent_at=now, error=f"Operator verified provider acceptance: {options['note']}"[:2000])
+                status="sent", sent_at=now, provider_accepted_at=now, error=f"Operator verified provider acceptance: {options['note']}"[:2000])
             flag = {"meeting_reminder_24h": "reminder_sent", "meeting_reminder_1h": "reminder_1h_sent"}.get(job.kind)
             if changed and flag:
                 Submission.objects.filter(pk=job.submission_id).update(**{flag: True})

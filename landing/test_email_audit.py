@@ -15,20 +15,19 @@ class EmailTemplateTests(TestCase):
             "session_time": "6:00 PM", "meeting_link": "https://example.com/meeting",
         })
 
-    def test_missing_templates_fall_back_for_all_slugs(self):
+    def test_missing_templates_fail_visibly_for_all_slugs(self):
         EmailTemplate.objects.all().delete()
-        with self.assertLogs("landing.emailing", level="ERROR"):
-            for slug in EmailTemplate.Slug.values:
+        for slug in EmailTemplate.Slug.values:
+            with self.assertRaisesMessage(ValueError, "missing"):
                 self.render_email(slug)
-        self.assertEqual(len(mail.outbox), 3)
-        self.assertTrue(all("Ada" in message.body for message in mail.outbox))
+        self.assertEqual(len(mail.outbox), 0)
 
-    def test_invalid_template_syntax_falls_back(self):
+    def test_invalid_template_syntax_fails_visibly(self):
+        from django.template import TemplateSyntaxError
         for slug in EmailTemplate.Slug.values:
             EmailTemplate.objects.filter(slug=slug).update(body="{% broken_tag %}")
-            with self.assertLogs("landing.emailing", level="ERROR"):
+            with self.assertRaises(TemplateSyntaxError):
                 self.render_email(slug)
-        self.assertTrue(all("{%" not in message.body for message in mail.outbox))
 
     def test_send_failure_propagates(self):
         with patch("landing.emailing.EmailMultiAlternatives.send", side_effect=SMTPException("unavailable")):
@@ -40,8 +39,7 @@ class EmailTemplateTests(TestCase):
             with self.assertRaises(SMTPException):
                 self.render_email()
 
-    def test_unknown_template_variables_trigger_fallback(self):
+    def test_unknown_template_variables_fail_visibly(self):
         EmailTemplate.objects.filter(slug="registration_complete").update(body="Hello {{ typo_first_name }}")
-        with self.assertLogs("landing.emailing", level="ERROR"):
+        with self.assertRaisesMessage(ValueError, "missing variable"):
             self.render_email()
-        self.assertIn("Ada", mail.outbox[0].body)

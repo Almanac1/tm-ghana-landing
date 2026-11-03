@@ -1,148 +1,167 @@
-# TM Nigeria reservation email deployment
+# Registration email automation with Celery
 
-Implemented locally November 2, 2026. No production deployment, account change, or live email test was performed. Tests use Django's in-memory backend and a separate test database.
+Implemented locally; production deployment is still required. No real mail was sent during development or tests.
 
-## Inspection and scheduler choice
+## What was inspected and retained
 
-The reservation form previously saved an unrelated Reservation and Submission, then synchronously sent the administrator alert before the visitor confirmation. Failure of the first email blocked the second. Existing reminder commands looked for date strings in a five-minute window and relied on row locks that SQLite does not implement. No scheduler installation was present in the repository. The default database is SQLite, optionally PostgreSQL; the WSGI module starts only Django. The old timezone was UTC, although the sessions use Nigerian wall-clock times. Existing admin-managed EmailTemplate records and shared MeetingSettings are reused.
+The public booking flow is `landing.views` → `email_queue.book()` → linked `Submission`, `Reservation`, and `ClassDate` records. The existing SQL outbox, conditional worker claims, legacy enrollment, cancellation/rescheduling signals, shared `MeetingSettings`, template admin, SMTP configuration and heartbeat model are reused. Synchronous request delivery and standalone polling have been replaced with Celery tasks and Beat.
 
-PythonAnywhere capabilities were checked against its official documentation on November 2, 2026:
+Actual database template identifiers were inspected:
 
-- [Always-on tasks](https://help.pythonanywhere.com/pages/AlwaysOnTasks/): paid accounts; the host restarts the process after failures/maintenance. Confirm an unused task slot on your own account.
-- [Scheduled tasks](https://help.pythonanywhere.com/pages/ScheduledTasks): paid accounts support hourly/daily tasks. Older free accounts have one daily task; newer free accounts have none. Hourly tasks cannot provide 30-second reminder precision; a daily task cannot meet this requirement.
-- [API](https://help.pythonanywhere.com/pages/API/): authenticated read-only task inventory is available.
+| Admin name | Identifier | Schedule |
+| --- | --- | --- |
+| Registration completion | `registration_complete` | Immediately after registration commits |
+| 24-hour meeting reminder | `meeting_reminder_24h` | ClassDate start minus 24 hours |
+| 1-hour meeting reminder | `meeting_reminder_1h` | ClassDate start minus 1 hour |
 
-**Your actual subscription, available task quota, deployment paths, and production SMTP reachability are unverified.** This workspace has no authenticated connection to the PythonAnywhere account. The worker below is ready for a paid account with an available Always-on slot. Verify that prerequisite before enabling it. If the account is free, upgrading to a plan with Always-on capability is required for this deployment approach. A browser console or web-process thread is not a durable substitute. An external scheduler would require a separately designed authenticated trigger; none is exposed by this change.
+Existing template placeholders are `user_first_name`, `session_date`, `session_time`, and `meeting_link`. Compatibility aliases `first_name`, `name`, `user`, `submission`, and `session_type` remain available. Added `participant_name`, `event`, `event_date`, `event_time`, `timezone`, and `session_timezone`. `session_time` includes WAT and Africa/Lagos. Templates can use `user.name` and `submission.name`. Both subject and body are fetched afresh at sending time. Missing templates, invalid syntax, unknown rendered variables, empty subject/body, missing name/email/event and missing meeting link produce visible outbox errors; no fallback silently replaces an admin template. A blank meeting link is retryable for all participant emails. Correct failed template records, then explicitly requeue the affected jobs using the recovery command below.
 
-## Behavior and data
+The locally inspected database had all three templates, **zero active events**, and **no meeting link**. This is not a statement about production. Set the shared meeting link in admin before registering a test participant. There are no event-specific links in this schema; every occurrence uses the current shared link.
 
-- A successful booking atomically saves the linked Reservation, Submission, and ScheduledEmail rows. One normalized email address per selected ClassDate is enforced through a unique registration key. Repeated submissions return the existing booking and do not replay emails. A cancelled booking stays cancelled until an administrator reactivates it.
-- Confirmation is attempted immediately **after commit**, before the HTTP request finishes. The admin alert is independent and also tracked. Failed/unfinished immediate dispatch stays in the database for the worker. With SMTP timeout 20 seconds, a slow provider can delay the request; no background thread is spawned inside WSGI.
-- Session date and time are combined explicitly in `Africa/Lagos` (WAT, UTC+1). Django uses aware datetimes and stores them in UTC. Email times include the zone. Changing Django's current timezone cannot change session interpretation.
-- Reminders are persisted at session start minus 24 hours and minus one hour. At registration, only strictly future reminder times are queued. At the exact due boundary, that reminder is omitted for a new registration.
-- The existing date-only form is retained. Dates with multiple active online times are excluded instead of choosing an arbitrary session. Configure one active online ClassDate per bookable Wednesday.
-- Cancel using **Reservation > is_cancelled**, **Submission > is_cancelled**, or deactivate the ClassDate. Pending emails are cancelled. Deleting a ClassDate or Reservation cancels pending emails and retains Submission/email records. Deleting a Submission cascades its email records.
-- Change ClassDate.date/time to reschedule everyone; change Submission.class_date or Reservation.session_date to move an individual. Pending reminders are recalculated, elapsed times cancelled, and sent reminders/confirmations never replayed. Editing Submission.class_date also updates the linked Reservation date. Linking a historical submission never replays its confirmation. Save through admin or model `.save()`; raw SQL, `bulk_update`, and `QuerySet.update` bypass scheduling hooks. The worker rechecks availability and schedule before sending, but cannot discover an earlier reschedule promptly if hooks were bypassed.
-- ScheduledEmail records original/current scheduled time, next attempt, session time, state, sent time, claim time, attempts, error, and stable Message-ID. View them under **Scheduled emails**, or within each Submission. **Email worker heartbeats** shows the last completed poll. Legacy reminder flags are read-only compatibility indicators; historical enrollment honors them when creating missing jobs.
+## Timing and durability
 
-## Delivery guarantees and retry policy
+`ClassDate.starts_at` explicitly interprets date/time in **Africa/Lagos (WAT, UTC+1)**, independently of the viewer's current timezone. Django has `USE_TZ=True` and `TIME_ZONE='Africa/Lagos'`; Celery uses UTC. Outbox deadlines are aware UTC timestamps. Admin displays datetimes in Django's active timezone.
 
-Conditional database UPDATE claims prevent two workers from sending the same pending row, including with SQLite. SMTP runs outside database transactions. A unique `(submission, kind)` constraint prevents duplicate queue entries. The normal policy is four dispatch attempts total with delays of 1, 2, and 4 minutes after temporary failure. Explicit SMTP 4xx rejections, temporary single-recipient refusals, DNS failures, connection refusal, missing meeting link, and a backend returning zero are retryable. SMTP 5xx/permanent or other non-transient errors fail visibly. One recipient's failure never stops the batch.
+Registration and outbox creation occur in the same transaction, including direct `Submission.save()` creation with an attached active event. A rollback removes the emails and discards the commit callback. `transaction.on_commit()` publishes immediate confirmation/admin job IDs. A broker failure is logged, leaves the rows pending, and does not turn a saved registration into a failed request. A repeated POST uses the existing unique normalized email/event registration and does not replay mail.
 
-An SMTP disconnect, timeout, reset, or broken pipe can occur after acceptance. Such messages become **uncertain**, with no automatic resend. A process killed while sending leaves a claim; after five minutes another worker marks it uncertain. This prevents automatic duplicates at the cost of requiring provider-log review for these messages. A crash before actual sending can also need that review. SMTP cannot provide both guaranteed delivery and exactly-once acceptance without a provider idempotency API. A stable Message-ID assists investigation but does not force SMTP recipient deduplication.
+Beat publishes a dispatcher every **30 seconds**. The dispatcher reads due SQL records and publishes short tasks containing only row IDs; no long ETA/countdown tasks are used. Losing broker messages or restarting services is recoverable from pending SQL records. Each task conditionally updates `pending` → `sending`; concurrent/redelivered tasks cannot claim an already claimed record. The database constraint is `(submission, occurrence, kind)`. The migration associates existing outbox records with their linked occurrence without scheduling historical mail.
 
-An email already in flight cannot be recalled when a booking is cancelled or rescheduled. Pending work and not-yet-started dispatches are protected. A session which has started never receives a reminder, including on retry. After an outage, due reminders catch up until session start, so a delayed reminder's template wording ("tomorrow" / "in 1 hour") can be approximate. Sent means the backend/SMTP accepted it, not that it reached an inbox; bounces and SPF/DKIM/DMARC remain provider concerns.
+Only future reminder deadlines are created at registration: >24 hours remaining creates both; >1 and <=24 creates the one-hour reminder; <=1 creates none. An exact deadline is already passed for this purpose. Confirmation still queues in every successful registration.
 
-At the default 30-second interval, expected dispatch delay is roughly **0–30 seconds plus batch processing/SMTP latency**, not a real-time guarantee. Each batch handles at most 100 jobs; CPU throttling, maintenance, network outages, large backlogs, and SQLite contention increase delay. Use one Always-on worker for this site's expected volume. Host restarts recover pending work from the same database.
+Expected dispatch tolerance with healthy idle services is **0–30 seconds plus broker, worker queue, rendering and SMTP latency**. There is no real-time guarantee. At send time, a reminder may be at most **five minutes late (inclusive)** and must precede event start. Older reminders become `expired`, including after outages; they are not sent together on recovery. Capacity is bounded to 1,000 due IDs per dispatcher pass; scale workers/database capacity for larger volumes and monitor overdue work.
 
-## Exact PythonAnywhere setup
+Cancellation of Submission, Reservation, or ClassDate (deactivation) cancels pending jobs. Deleting a ClassDate/Reservation cancels linked work; deleting a Submission cascades its outbox. Saving ClassDate.date/time recalculates unsent reminders, including previously expired/failed reminders when the start changes; sent reminders remain sent. Moving a participant to another ClassDate cancels its old pending records and creates eligible reminder records for the new occurrence. A pending confirmation follows the moved booking; sent confirmations are never replayed. Historical sent flags remain compatible.
 
-1. In **Account**, verify a paid subscription. In **Tasks**, verify an available **Always-on tasks** slot. Record the project source directory and virtualenv path shown on **Web**. Do not guess those paths from this Mac workspace.
+Use admin or model `.save()` for schedule/cancellation edits. Bulk SQL / `QuerySet.update()` bypass hooks. Sending tasks recheck current cancellation, occurrence, event time and deadline, but an earlier event moved through bulk SQL cannot be discovered promptly from a later stored deadline. An email already being transmitted cannot be recalled, and a cancellation/reschedule can race with the final network call.
 
-   Optional read-only inventory, run in a new PythonAnywhere Bash console after generating an API token in Account > API Token:
+## Attempts and acceptance
 
-   ```bash
-   python scripts/pythonanywhere_email_capabilities.py
-   # EU accounts:
-   python scripts/pythonanywhere_email_capabilities.py --host eu.pythonanywhere.com
-   ```
+There are four automatic transport attempts, with exponential delays of **1, 2, and 4 minutes** for known transient failures (explicit SMTP 4xx rejection, DNS/connection refusal, recipient 4xx, backend returning zero). The deadline/expiry rules still apply on each retry, so a reminder can expire before using all four attempts. Permanent/configuration failures stop visibly. Rows retain attempts, last attempt time, claim time, next attempt, recipient, Message-ID, sent time, provider acceptance timestamp and useful errors. Recipient is set when scheduled and refreshed to the actual recipient before transport.
 
-   Run from the deployed project directory. The script reads PythonAnywhere's `API_TOKEN` environment variable without printing it. API listing success alone does not prove unused task quota; the Account/Tasks check is still required. No API token is needed by the email worker.
+`sent` / `provider_accepted_at` means **the configured backend accepted the message**, not confirmed inbox delivery. SMTP acceptance does not prove inbox placement; with file/locmem test backends, it means the test backend accepted it. Bounce/delivery webhooks are not implemented.
 
-2. Upload/pull these changes into the deployed checkout. Open a Bash console in the project directory and activate the **same virtualenv used by Web** (`workon YOUR_ENV`, or `source /absolute/virtualenv/bin/activate`). The commands below derive actual paths from there:
+The configured provider is SMTP (Namecheap Private Email), which has no provider idempotency-key API. A stable Message-ID aids investigation but is not an idempotency guarantee. Disconnects, timeouts, resets, broken pipes and soft task timeouts become `uncertain`; they are not automatically retried. A worker crash while holding a claim becomes uncertain after five minutes. Send tasks have 60-second soft/90-second hard limits on the production prefork worker, below that lease. This conservative policy may require manual recovery even for a crash before transmission. If SMTP accepts a message and the process dies before saving acceptance, delivery is uncertain; manually retrying without checking provider logs can duplicate it. Exactly-once SMTP delivery is not claimed.
 
-   ```bash
-   export TM_PROJECT_DIR="$PWD"
-   export TM_PYTHON="$(command -v python)"
-   test -f "$TM_PROJECT_DIR/manage.py"
-   "$TM_PYTHON" -m pip install -r "$TM_PROJECT_DIR/requirements.txt"
-   "$TM_PYTHON" "$TM_PROJECT_DIR/manage.py" check
-   "$TM_PYTHON" "$TM_PROJECT_DIR/manage.py" test --verbosity 1
-   ```
-
-3. Set SMTP credentials in the project's ignored `.env`, or in an environment configuration shared by **both Web and Tasks**. The project loads `.env` by absolute BASE_DIR for every invocation, independently of working directory. Keep its existing unrelated entries. Required values:
-
-   ```dotenv
-   EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-   EMAIL_HOST=mail.privateemail.com
-   EMAIL_HOST_USER=your-authorized-sender@tmnigeria.com
-   EMAIL_HOST_PASSWORD=your-privateemail-password
-   DEFAULT_FROM_EMAIL=your-authorized-sender@tmnigeria.com
-   LANDING_ADMIN_EMAIL=your-admin-inbox@tmnigeria.com
-   ```
-
-   The configured transport remains SSL port 465 with a 20-second timeout. No credential value is committed. EMAIL_HOST_USER no longer has a hardcoded account fallback: explicitly add it to the production environment. Protect the file:
-
-   ```bash
-   chmod 600 "$TM_PROJECT_DIR/.env"
-   ```
-
-4. Back up the deployed database before migration using the host's normal database backup procedure. Apply migrations, which **do not enqueue historical emails**:
-
-   ```bash
-   "$TM_PYTHON" "$TM_PROJECT_DIR/manage.py" migrate --noinput
-   "$TM_PYTHON" "$TM_PROJECT_DIR/manage.py" makemigrations --check --dry-run
-   ```
-
-   In admin, review the three existing Email templates, the shared Meeting settings link, and active upcoming Class dates. Enter session times in Lagos local time. Invalid template syntax or unknown variables uses the built-in fallback and logs the problem. Review old schedule values because interpreting existing times as Lagos is an intentional change from the old UTC behavior.
-
-5. Historical submissions have no dependable session foreign key or Reservation link. They are left untouched initially. Preview enrollment and review ambiguous/duplicate records:
-
-   ```bash
-   "$TM_PYTHON" "$TM_PROJECT_DIR/manage.py" enroll_legacy_reminders
-   ```
-
-   After reviewing, the following explicitly enrolls uniquely matched future sessions; it suppresses historical confirmations/admin alerts and honors existing sent flags:
-
-   ```bash
-   "$TM_PYTHON" "$TM_PROJECT_DIR/manage.py" enroll_legacy_reminders --apply
-   ```
-
-   This queues real upcoming participant reminders; do it only as part of your intended production rollout. Unmatched/ambiguous/duplicate submissions are reported for manual review. Historical Reservation/Submission pairings cannot safely be inferred: link known pairs in Submission admin, or cancel historical bookings through Submission. Repeated enrollment is idempotent.
-
-6. Disable the **old** scheduler entries for `send_session_reminders` and `send_session_1h_reminders`. Both commands now delegate to the persisted queue without the old five-minute window; no implicit historical enrollment occurs. Do not run the obsolete code in another checkout against the production database.
-
-   Generate the exact Always-on command from the deployed checkout/virtualenv:
-
-   ```bash
-   "$TM_PYTHON" -c 'import pathlib, shlex, sys; print(shlex.join([sys.executable, "-u", str(pathlib.Path("manage.py").resolve()), "process_email_queue", "--loop", "--interval", "30", "--limit", "100"]))'
-   ```
-
-   Copy its printed line into **Tasks > Always-on tasks > command**. Click **Create** and confirm **Running**. It will look like:
-
-   ```text
-   /home/YOUR_USERNAME/.virtualenvs/YOUR_ENV/bin/python -u /home/YOUR_USERNAME/YOUR_PROJECT/manage.py process_email_queue --loop --interval 30 --limit 100
-   ```
-
-   These example placeholders are not claimed to be your account's real paths; the generator prints those exactly. No Redis, Celery broker, APScheduler, crontab, or extra package is required. Reload the web app on **Web** after migration/configuration. Web and worker must point to the same checkout, database, and `.env`.
-
-7. Verify after the worker completes its first poll:
-
-   ```bash
-   "$TM_PYTHON" "$TM_PROJECT_DIR/manage.py" email_queue_status --max-age 120
-   ```
-
-   This is read-only and exits nonzero for missing/stale heartbeat, overdue pending work, failed or uncertain sends. The Tasks log should regularly show `Email queue checked; sent=...`. View the Always-on task's log using its log button; confirm heartbeat progression over multiple polls. Restart the task once and verify progression resumes. Admin and this command only display status; they do not run the scheduler. Production SMTP connectivity and inbox delivery still require a deliberately controlled registration using your own test address after deployment.
-
-## Failure recovery
-
-Inspect Scheduled emails.error, attempts, and Message-ID and consult provider logs. Correct credentials/meeting link/configuration first. Pending transient jobs retry automatically. For failed or uncertain jobs, use a specific record ID with investigation evidence (the command itself never sends):
+Investigate provider logs before resolving failed/uncertain rows:
 
 ```bash
-python manage.py resolve_email_delivery 123 --accepted --note 'Provider log confirms acceptance; reference ABC'
-python manage.py resolve_email_delivery 123 --retry --note 'Provider log confirms no acceptance; configuration fixed'
+python manage.py resolve_email_delivery 123 --accepted --note 'Provider log reference confirms acceptance'
+# OR, only if provider logs confirm it was not accepted:
+python manage.py resolve_email_delivery 123 --retry --note 'Provider confirms no acceptance; configuration corrected'
 ```
 
-Choose one resolution, not both. `--accepted` records the operator's verification time as sent_at; consult provider logs for the actual historical acceptance time. `--retry` requeues while preserving attempts. If the four-attempt budget was exhausted it authorizes one additional dispatch; further failures stop again. Retrying an uncertain message without verifying non-acceptance can duplicate it. Cancellation/session-start checks still apply to manually requeued jobs.
+These commands record a resolution without sending directly. Attempts are preserved; manual retry authorizes an additional attempt if the automatic budget is exhausted. `--accepted` records the operator verification time. Pending work is picked up by Beat.
 
-## Local verification
+## Install and run
+
+From the deployed project checkout, activate its Python virtualenv. All processes must use the same configuration and persistent database. Back up the production database first, stop the previous standalone worker and old reminder cron jobs, install and migrate, then reload Django and start worker/Beat. Migrations do not send mail.
 
 ```bash
-.venv/bin/python manage.py test --verbosity 1
-.venv/bin/python manage.py check
-.venv/bin/python manage.py makemigrations --check --dry-run
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python manage.py migrate --noinput
+python manage.py check
+python manage.py makemigrations --check --dry-run
 ```
 
-Final local verification: **55 tests passed**, Django system check passed, migration drift check passed, and migrations 0018/0019 were applied to the local database. No upcoming active sessions or shared meeting link are configured locally; these are not observations about production.
+Celery 5.5.3 supports this checkout's Python 3.9 runtime; timezone-data was updated to satisfy Kombu. Environment examples are in `.env.example`; merge values into the existing ignored `.env`, preserving unrelated settings. Credentials must be supplied by environment or this ignored file, and must be shared by web, worker and Beat. The project loads `.env` using its absolute project path. SSL 465 is the existing SMTP default; TLS/port/timeout are now configurable. Do not enable SSL and STARTTLS simultaneously.
 
-The suite covers the full HTTP booking flow, post-commit confirmation, saved templates, both reminder boundaries, Lagos independent of the current timezone, late registrations, cancellations/deletion, session/individual rescheduling, rollback, temporary/permanent failures, retry limits, zero send count, independent administrator failures, overlapping claims, repeated POSTs, persisted-queue restart/catch-up, expired reminders, missing links, uncertain SMTP/crashed claims, legacy enrollment, and heartbeat health. Tests never send to real participants. The original audit's expected-failure tests have been replaced by passing regressions for the repaired workflow; obsolete five-minute-window expectations were intentionally removed. The standalone live SMTP audit script is not part of this test suite and was not run.
+For a local Redis broker, with Docker installed and running (separate terminal):
+
+```bash
+docker run --name tm-email-redis --publish 127.0.0.1:6379:6379 --volume tm-email-redis:/data redis:7-alpine redis-server --appendonly yes
+# For later restarts of this same container:
+# docker start --attach tm-email-redis
+```
+
+Set `CELERY_BROKER_URL=redis://127.0.0.1:6379/0`. In production use an authenticated private Redis service, or `rediss://` for TLS as required by the service. Retain the database even if the broker is replaced.
+
+Run a continuous worker in a second terminal/service:
+
+```bash
+python -m celery -A config worker --loglevel=INFO --concurrency=2
+```
+
+Run **exactly one** Beat instance in a third terminal/service:
+
+```bash
+python -m celery -A config beat --loglevel=INFO --schedule=./celerybeat-schedule
+```
+
+Use the default prefork pool on Linux for the task time limits. If developing on macOS and prefork is unavailable, `--pool=solo` can be used for a controlled local test; it does not enforce the same hard time limits. Beat needs a writable schedule-file directory. SQL rows, not that file, contain individual email deadlines. Do not use worker `-B` in addition to a separate Beat process. Celery documents the [single scheduler requirement](https://docs.celeryq.dev/en/v5.5.3/userguide/periodic-tasks.html).
+
+The repository's ALLOWED_HOSTS and existing operations script identify **PythonAnywhere** as the intended host. No Docker/service/supervisor deployment manifest or authenticated host inventory exists here. Its actual plan, process quota and broker connectivity remain unverified. PythonAnywhere [Always-on tasks](https://help.pythonanywhere.com/pages/AlwaysOnTasks/) require a paid account. Provision continuously supervised worker and Beat processes (separate available slots/services), plus reachable Redis. Do not assume the host supports a local Redis daemon or arbitrary outbound broker connections: verify this with the host/account, or run the broker and Celery services on a host that supports them and can reach the same database. A free sleeping web host, request threads, browser console or hourly/daily cron cannot meet this schedule. CPU quota exhaustion can stop even an Always-on task. For production prefork/concurrency use a shared persistent PostgreSQL database; the default local SQLite database is suitable for development and small single-host installations, not separate ephemeral filesystems.
+
+## Monitoring and recovery
+
+Admin → Scheduled emails exposes type, recipient, deadline, status, attempts, sent time and errors; details also include occurrence, next attempt, claim, acceptance and Message-ID. Submission admin retains the inline status view. Email worker heartbeats contains independent `email_worker` (worker dispatcher/send execution) and `email_scheduler` (actual Beat tick) rows and a stale indicator after 120 seconds. Missing processes are reported by:
+
+```bash
+python manage.py email_queue_status --max-age 120
+```
+
+Run this after the first 30–60 seconds, then via external monitoring. It exits nonzero for a missing/stale worker or scheduler heartbeat, overdue pending work or failed/uncertain mail. Admin is a status view; it does not start services. A fresh scheduler plus stale worker usually means broker/worker trouble. A fresh worker plus stale scheduler can mean Beat is stopped while previously queued tasks execute.
+
+`python manage.py process_email_queue` now requests a one-off Celery dispatcher; `--loop` fails with instructions to use Beat. Both old `send_session_*_reminders` commands now also request Celery dispatch, never direct SMTP. Disable their previous scheduled entries to avoid redundant publishing. Existing `enroll_legacy_reminders` preview / `--apply` remains opt-in for historical submissions and suppresses historical confirmations; inspect its output before applying.
+
+## Verify all three emails safely
+
+Automated verification uses a separate test database and the locmem backend, including actual Celery task execution with broker publishing mocked:
+
+```bash
+python manage.py test --verbosity 1
+```
+
+For a staging end-to-end check with real worker/Beat processes, use a separate staging database and **file-based email**, not production participants. In staging's environment for web AND worker:
+
+```dotenv
+EMAIL_BACKEND=django.core.mail.backends.filebased.EmailBackend
+EMAIL_FILE_PATH=/absolute/writable/path/tm-test-emails
+DEFAULT_FROM_EMAIL=sender@example.com
+LANDING_ADMIN_EMAIL=admin@example.com
+```
+
+Configure Meeting settings with a test meeting URL. Verify the three admin templates. Start Redis, worker and one Beat as above, then create a test occurrence and book against it from Django shell (this bypasses the public form's Wednesday-only date selector):
+
+```bash
+python manage.py shell
+```
+
+```python
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+from django.conf import settings
+from django.utils import timezone
+from landing.models import ClassDate
+from landing.email_queue import book
+assert settings.EMAIL_BACKEND == 'django.core.mail.backends.filebased.EmailBackend'
+start = (timezone.now() + timedelta(hours=24, minutes=2)).astimezone(ZoneInfo('Africa/Lagos')).replace(microsecond=0)
+event = ClassDate.objects.create(date=start.date(), time=start.time().replace(tzinfo=None))
+registration = book(session_date=event.date, name='Email Test', email='email-test@example.com', phone='123')
+print('Event ID:', event.pk, 'Registration ID:', registration.pk)
+print(list(registration.scheduled_emails.values('kind', 'scheduled_at', 'status')))
+```
+
+Use a date with no other active online occurrence; the date-only booking flow rejects ambiguous dates. Expect a confirmation file promptly and a separate existing admin-alert file. After approximately two minutes plus tolerance, the 24-hour reminder file should appear with correct name, Lagos date/time, timezone and meeting URL. Check its `sent` status in admin.
+
+To verify the one-hour reminder without waiting 23 more hours, **after the 24-hour reminder is sent**, reopen shell and reschedule the same occurrence:
+
+```python
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+from django.utils import timezone
+from landing.models import ClassDate
+# Replace 123 with the Event ID printed above.
+event = ClassDate.objects.get(pk=123)
+start = (timezone.now() + timedelta(hours=1, minutes=2)).astimezone(ZoneInfo('Africa/Lagos')).replace(microsecond=0)
+event.date, event.time = start.date(), start.time().replace(tzinfo=None)
+event.save()
+```
+
+Expect the one-hour reminder about two minutes later, using the new event details. The sent confirmation and 24-hour reminder must not replay. For a full unchanged-schedule acceptance test, instead set an occurrence >24 hours away, register through the Wednesday public form, and leave services running through both original deadlines. The accelerated test verifies rescheduling too, rather than pretending two minutes equals 24 hours.
+
+Stop/restart worker and Beat before a reminder deadline to verify pending recovery. A restart within five minutes of the deadline sends it; after five minutes it expires. Use separate staging registrations to test cancellation and late-registration rules. The unit suite covers those exact timing boundaries without waiting. File capture verifies application rendering/dispatch only. Verify actual provider acceptance and inbox placement later using an explicitly controlled registration with your own address and SMTP enabled.
+
+## Local completion and deployment boundary
+
+The Celery implementation, migrations and tests are in this checkout. Final local verification: 69 tests passed, Django system check passed, migration drift check passed, dependency consistency check passed, and migrations 0020/0021 were applied to the local database. Celery task discovery and the configured 30-second Beat entry were verified; a live Redis/worker/Beat stack and production SMTP were not exercised here. Production installation/migration, broker provisioning, continuously supervised worker and singleton Beat, host quotas/network access, meeting link/upcoming events and controlled SMTP/inbox verification remain deployment work. No production services were started and no real email was sent.

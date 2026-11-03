@@ -6,19 +6,24 @@ from landing.models import EmailWorkerHeartbeat, ScheduledEmail
 
 
 class Command(BaseCommand):
-    help = "Read-only worker heartbeat and queue health; exits nonzero for stale heartbeat or delivery failures."
+    help = "Read-only worker/scheduler heartbeat and queue health."
 
     def add_arguments(self, parser):
-        parser.add_argument("--max-age", type=int, default=120, help="Maximum heartbeat age in seconds")
+        parser.add_argument("--max-age", type=int, default=120)
 
     def handle(self, *args, **options):
         now = timezone.now()
-        heartbeat = EmailWorkerHeartbeat.objects.filter(pk="email_worker").first()
-        self.stdout.write(f"Last completed queue poll: {heartbeat.last_seen_at if heartbeat else 'never'}")
+        threshold = now - timedelta(seconds=options["max_age"])
+        stale = []
+        for name in ("email_worker", "email_scheduler"):
+            heartbeat = EmailWorkerHeartbeat.objects.filter(pk=name).first()
+            self.stdout.write(f"{name}: {heartbeat.last_seen_at if heartbeat else 'never'}")
+            if not heartbeat or heartbeat.last_seen_at < threshold:
+                stale.append(name)
         self.stdout.write(str(list(ScheduledEmail.objects.values("status").annotate(count=Count("pk")))))
-        overdue = ScheduledEmail.objects.filter(status="pending", next_attempt_at__lt=now-timedelta(seconds=options["max_age"])).count()
+        overdue = ScheduledEmail.objects.filter(status="pending", next_attempt_at__lt=threshold).count()
         self.stdout.write(f"Overdue messages: {overdue}")
-        if not heartbeat or heartbeat.last_seen_at < now-timedelta(seconds=options["max_age"]):
-            raise CommandError("Worker heartbeat missing or stale")
+        if stale:
+            raise CommandError("Heartbeat missing or stale: " + ", ".join(stale))
         if overdue or ScheduledEmail.objects.filter(status__in=["failed", "uncertain"]).exists():
             raise CommandError("Email queue needs attention; inspect Scheduled emails in admin")
