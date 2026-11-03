@@ -240,7 +240,8 @@ class OnlineReservationFlowTests(TestCase):
             "measured_height": "450",
         }
         payload.update(overrides)
-        return self.client.post(reverse("home"), data=payload)
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post(reverse("home"), data=payload)
 
     def test_booking_form_only_offers_upcoming_online_wednesdays(self):
         ClassDate.objects.create(
@@ -321,12 +322,12 @@ class OnlineReservationFlowTests(TestCase):
         self.assertEqual(submission.session_type, Reservation.SessionType.ONLINE)
         self.assertEqual(submission.session_date, self.session_date.isoformat())
         self.assertEqual(len(mail.outbox), 2)
-        self.assertEqual(mail.outbox[1].subject, "Confirmation for Ada")
-        self.assertIn("Session mode: Online Session", mail.outbox[0].body)
-        self.assertIn("Hello Ada", mail.outbox[1].body)
-        self.assertIn("6:00 PM", mail.outbox[1].body)
-        self.assertNotIn(self.meeting_settings.meeting_link, mail.outbox[1].body)
-        self.assertIn(self.class_date.full_display_label, mail.outbox[0].body)
+        self.assertEqual(mail.outbox[0].subject, "Confirmation for Ada")
+        self.assertIn("Session mode: Online Session", mail.outbox[1].body)
+        self.assertIn("Hello Ada", mail.outbox[0].body)
+        self.assertIn("6:00 PM", mail.outbox[0].body)
+        self.assertNotIn(self.meeting_settings.meeting_link, mail.outbox[0].body)
+        self.assertIn(self.class_date.full_display_label, mail.outbox[1].body)
 
     def test_posted_physical_session_type_is_ignored(self):
         self.complete_lead_form()
@@ -352,81 +353,30 @@ class OnlineReservationFlowTests(TestCase):
     def test_submission_still_succeeds_when_email_sending_fails(self):
         self.complete_lead_form(name="Grace Hopper", email="grace@example.com")
 
-        with patch("landing.views._send_submission_emails", side_effect=RuntimeError("mail down")):
+        with patch("landing.email_queue._send", side_effect=RuntimeError("mail down")):
             response = self.reserve()
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, f"{reverse('home')}#booking")
         self.assertEqual(Submission.objects.count(), 1)
 
-    def test_reminder_command_sends_one_dynamic_reminder_24_hours_before_session(self):
-        now = timezone.make_aware(datetime(2030, 1, 1, 19, 0))
-        session_time = time(19, 0)
-        session_date = (now + timedelta(hours=24)).date()
-        self.class_date.date = session_date
-        self.class_date.time = session_time
-        self.meeting_settings.meeting_link = "https://meet.example.com/updated-session"
-        self.meeting_settings.save()
-        self.class_date.save()
-        submission = Submission.objects.create(
-            name="Ada Lovelace",
-            email="ada@example.com",
-            phone="8035550102",
-            session_type=Reservation.SessionType.ONLINE,
-            session_date=session_date.isoformat(),
-        )
-        template = EmailTemplate.objects.get(slug=EmailTemplate.Slug.MEETING_REMINDER_24H)
-        template.subject = "24h reminder for {{ user_first_name }}"
-        template.body = "24h {{ user_first_name }} {{ session_date }} {{ session_time }} {{ meeting_link }}"
-        template.save()
+    def test_repeated_reservation_posts_do_not_create_or_email_twice(self):
+        self.complete_lead_form()
+        self.reserve()
+        self.reserve()
+        self.assertEqual(Submission.objects.count(), 1)
+        self.assertEqual(Reservation.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 2)
 
-        with patch("landing.management.commands.send_session_reminders.timezone.now", return_value=now):
-            call_command("send_session_reminders")
-            call_command("send_session_reminders")
+    def test_invalid_edited_contact_details_do_not_create_booking_or_send(self):
+        self.client.post(reverse("home"), {"form_type": "lead", "ui_action": "edit",
+            "payload_name": "Ada", "payload_email": "invalid-address", "payload_country": "NG", "payload_phone": "123"})
+        self.assertEqual(self.reserve().status_code, 200)
+        self.assertFalse(Submission.objects.exists())
+        self.assertEqual(len(mail.outbox), 0)
 
-        submission.refresh_from_db()
-        self.assertTrue(submission.reminder_sent)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(
-            mail.outbox[0].subject,
-            "24h reminder for Ada",
-        )
-        self.assertIn("24h Ada", mail.outbox[0].body)
-        self.assertIn("Wednesday, January 2, 2030", mail.outbox[0].body)
-        self.assertIn("7:00 PM", mail.outbox[0].body)
-        self.assertIn("https://meet.example.com/updated-session", mail.outbox[0].body)
-
-    def test_one_hour_reminder_command_sends_once_with_current_meeting_link(self):
-        now = timezone.make_aware(datetime(2030, 1, 1, 18, 0))
-        session_time = time(19, 0)
-        self.class_date.date = now.date()
-        self.class_date.time = session_time
-        self.meeting_settings.meeting_link = "https://meet.example.com/final-reminder"
-        self.meeting_settings.save()
-        self.class_date.save()
-        submission = Submission.objects.create(
-            name="Grace Hopper",
-            email="grace@example.com",
-            phone="8035550103",
-            session_type=Reservation.SessionType.ONLINE,
-            session_date=now.date().isoformat(),
-        )
-        template = EmailTemplate.objects.get(slug=EmailTemplate.Slug.MEETING_REMINDER_1H)
-        template.subject = "1h reminder for {{ user_first_name }}"
-        template.body = "1h {{ user_first_name }} {{ session_time }} {{ meeting_link }}"
-        template.save()
-
-        with patch("landing.management.commands.send_session_1h_reminders.timezone.now", return_value=now):
-            call_command("send_session_1h_reminders")
-            call_command("send_session_1h_reminders")
-
-        submission.refresh_from_db()
-        self.assertTrue(submission.reminder_1h_sent)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(
-            mail.outbox[0].subject,
-            "1h reminder for Grace",
-        )
-        self.assertIn("1h Grace", mail.outbox[0].body)
-        self.assertIn("7:00 PM", mail.outbox[0].body)
-        self.assertIn("https://meet.example.com/final-reminder", mail.outbox[0].body)
+    def test_multiple_times_on_same_date_are_not_ambiguously_bookable(self):
+        ClassDate.objects.create(date=self.session_date, time=time(19))
+        self.complete_lead_form()
+        self.assertEqual(self.reserve().status_code, 200)
+        self.assertFalse(Submission.objects.exists())

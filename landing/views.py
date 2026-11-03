@@ -1,17 +1,13 @@
-import logging
 from django.http import HttpResponse
+from django.core.exceptions import ValidationError
 from typing import Optional
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
 from django.shortcuts import get_object_or_404, redirect, render
-from django.template.loader import render_to_string
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from .emailing import send_template_email
 from .forms import LeadCaptureForm, ReservationForm, get_active_class_date_options
-from .meeting_settings import get_meeting_link
-from .models import BlogArticle, ClassDate, EmailTemplate, HomePageContent, Reservation, Submission
+from .models import BlogArticle, HomePageContent, Reservation
 
 
 BENEFITS = [
@@ -47,7 +43,6 @@ FAQS = [
 
 SUCCESS_STATE_SESSION_KEY = "landing_form_success_state"
 LEAD_DETAILS_SESSION_KEY = "landing_lead_details_completed"
-logger = logging.getLogger(__name__)
 
 
 DEFAULT_HOMEPAGE_CONTENT = {
@@ -111,21 +106,6 @@ def _get_homepage_content() -> dict:
     return content_data
 
 
-def _get_session_details(session_date: str) -> dict[str, str]:
-    scheduled_date = (
-        ClassDate.objects.filter(session_type=Reservation.SessionType.ONLINE, date=session_date)
-        .order_by("display_order", "time")
-        .first()
-    )
-    if scheduled_date:
-        return {
-            "date": scheduled_date.date.strftime("%A, %B %-d, %Y"),
-            "time": scheduled_date.time.strftime("%-I:%M %p"),
-            "meeting_link": get_meeting_link(),
-        }
-    return {"date": session_date, "time": "", "meeting_link": get_meeting_link()}
-
-
 def _build_home_context(**overrides) -> dict:
     class_date_options = overrides.pop("class_date_options", None)
     if class_date_options is None:
@@ -141,48 +121,6 @@ def _build_home_context(**overrides) -> dict:
     }
     context.update(overrides)
     return context
-
-
-def _send_submission_emails(submission: Submission) -> None:
-    from_email = settings.DEFAULT_FROM_EMAIL
-    admin_to = [settings.LANDING_ADMIN_EMAIL]
-    first_name = _extract_first_name(submission.name)
-    session_type = submission.get_session_type_display() if submission.session_type else "Not provided"
-    session_details = _get_session_details(submission.session_date)
-
-    admin_subject = f"New registration entry from {submission.name}"
-    admin_body = render_to_string(
-        "landing/emails/admin_submission_notification.txt",
-        {
-            "submission": submission,
-            "first_name": first_name,
-            "name": submission.name,
-            "session_type": session_type,
-            "session_date": f"{session_details['date']} at {session_details['time']}".rstrip(" at "),
-        },
-    )
-
-    EmailMultiAlternatives(
-        subject=admin_subject,
-        body=admin_body,
-        from_email=from_email,
-        to=admin_to,
-        reply_to=[submission.email],
-    ).send(fail_silently=False)
-
-    send_template_email(
-        slug=EmailTemplate.Slug.REGISTRATION_COMPLETE,
-        to=[submission.email],
-        context={
-            "submission": submission,
-            "user": submission,
-            "user_first_name": first_name,
-            "name": submission.name,
-            "session_type": session_type,
-            "session_date": session_details["date"],
-            "session_time": session_details["time"],
-        },
-    )
 
 
 @require_http_methods(["GET", "POST"])
@@ -329,19 +267,28 @@ def home(request):
                             )
 
                         measured_height = _sanitize_measured_height(request.POST.get("measured_height"))
-                        reservation_form.save()
-                        submission = Submission.objects.create(
-                            name=lead_name,
-                            email=lead_email,
-                            phone=lead_phone,
-                            session_type=Reservation.SessionType.ONLINE,
-                            session_date=reservation_form.cleaned_data["session_date"],
-                            message=(request.POST.get("message") or "").strip(),
-                        )
+                        from .email_queue import book
+                        contact_form = LeadCaptureForm(data={
+                            "name": lead_name, "email": lead_email, "phone": lead_phone,
+                            "country": lead_details.get("country", "NG"),
+                        })
+                        if not contact_form.is_valid():
+                            request.session.pop(LEAD_DETAILS_SESSION_KEY, None)
+                            reservation_gate_message = "Please enter valid contact details before reserving."
+                            return render(request, "landing/home.html", _build_home_context(
+                                lead_form=lead_form, reservation_form=reservation_form,
+                                lead_details_completed=False, reservation_gate_message=reservation_gate_message))
                         try:
-                            _send_submission_emails(submission)
-                        except Exception:  # noqa: BLE001 - capture email backend issues without blocking success UI
-                            logger.exception("Failed to send submission emails for submission id=%s", submission.id)
+                            submission = book(
+                                name=lead_name, email=lead_email, phone=lead_phone,
+                                session_date=reservation_form.cleaned_data["session_date"],
+                                message=(request.POST.get("message") or "").strip(),
+                            )
+                        except ValidationError as exc:
+                            reservation_form.add_error("session_date", exc)
+                            return render(request, "landing/home.html", _build_home_context(
+                                lead_form=lead_form, reservation_form=reservation_form,
+                                lead_details_completed=True, reservation_gate_message=" ".join(exc.messages)))
                         request.session[SUCCESS_STATE_SESSION_KEY] = {
                             "form_type": "reservation",
                             "payload": {

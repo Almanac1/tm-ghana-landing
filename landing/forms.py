@@ -1,21 +1,24 @@
 from django import forms
 from django.utils import timezone
+from zoneinfo import ZoneInfo
+from collections import Counter
 
 from .models import ClassDate, LeadCapture, Reservation
 
 
 def get_active_class_date_options():
     """Return active, upcoming Wednesday dates for online introductory sessions."""
-    today = timezone.localdate()
+    today = timezone.localdate(timezone=ZoneInfo("Africa/Lagos"))
     class_dates = ClassDate.objects.filter(
         is_active=True,
         session_type=Reservation.SessionType.ONLINE,
         date__gte=today,
     ).order_by("display_order", "date", "time")
 
+    counts = Counter(item.value for item in class_dates)
     options_by_date = {}
     for class_date in class_dates:
-        if class_date.date.weekday() != 2:
+        if class_date.date.weekday() != 2 or counts[class_date.value] != 1 or class_date.starts_at <= timezone.now():
             continue
         options_by_date[class_date.value] = {
             "value": class_date.value,

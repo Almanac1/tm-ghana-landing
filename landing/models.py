@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
@@ -18,6 +18,16 @@ class ClassDate(models.Model):
         ordering = ("display_order", "date", "time")
         verbose_name = "Class date"
         verbose_name_plural = "Class dates"
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+
+    @property
+    def starts_at(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        return timezone.make_aware(datetime.combine(self.date, self.time), ZoneInfo("Africa/Lagos"))
 
     def __str__(self) -> str:
         return f"{self.get_session_type_display()} - {self.display_label}"
@@ -163,15 +173,25 @@ class Reservation(models.Model):
         JUL22_2026 = "2026-07-22", "Wednesday, July 22, 2026"
         JUL29_2026 = "2026-07-29", "Wednesday, July 29, 2026"
 
+    is_cancelled = models.BooleanField(default=False)
     session_date = models.CharField(max_length=10)
     session_type = models.CharField(max_length=12, choices=SessionType.choices, default=SessionType.ONLINE)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.session_date} - {self.get_session_type_display()}"
 
 
 class Submission(models.Model):
+    class_date = models.ForeignKey(ClassDate, null=True, blank=True, on_delete=models.SET_NULL)
+    reservation = models.OneToOneField(Reservation, null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name="submission")
+    registration_key = models.CharField(max_length=64, unique=True, null=True, editable=False)
+    is_cancelled = models.BooleanField(default=False)
     name = models.CharField(max_length=150)
     email = models.EmailField()
     phone = models.CharField(max_length=20)
@@ -187,5 +207,49 @@ class Submission(models.Model):
     reminder_1h_sent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self.class_date_id:
+                import hashlib
+                self.email = self.email.strip().lower()
+                self.registration_key = hashlib.sha256(f"{self.email}:{self.class_date_id}".encode()).hexdigest()
+                self.session_date = self.class_date.date.isoformat()
+                self.session_type = self.class_date.session_type
+                if kwargs.get("update_fields"):
+                    kwargs["update_fields"] = set(kwargs["update_fields"]) | {"session_date", "session_type", "email", "registration_key"}
+            super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.name} - {self.session_date}"
+
+
+class ScheduledEmail(models.Model):
+    class Status(models.TextChoices):
+        SKIPPED = "skipped", "Skipped (historical notification)"
+        PENDING = "pending", "Pending"
+        SENDING = "sending", "Sending"
+        SENT = "sent", "Sent (SMTP accepted)"
+        FAILED = "failed", "Failed"
+        CANCELLED = "cancelled", "Cancelled / expired"
+        UNCERTAIN = "uncertain", "Uncertain — review provider logs"
+
+    submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name="scheduled_emails")
+    kind = models.CharField(max_length=64, choices=[*EmailTemplate.Slug.choices, ("admin_notification", "Administrator alert")])
+    scheduled_at = models.DateTimeField()
+    next_attempt_at = models.DateTimeField()
+    session_at = models.DateTimeField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    error = models.TextField(blank=True)
+    message_id = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["submission", "kind"], name="unique_submission_email_kind")]
+        indexes = [models.Index(fields=["status", "next_attempt_at"], name="email_due_idx")]
+
+
+class EmailWorkerHeartbeat(models.Model):
+    name = models.CharField(primary_key=True, max_length=40, default="email_worker")
+    last_seen_at = models.DateTimeField()

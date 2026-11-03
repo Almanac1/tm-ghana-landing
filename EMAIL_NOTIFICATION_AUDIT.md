@@ -1,5 +1,7 @@
 # TM Nigeria automated email audit
 
+November 2, 2026 update: the local delivery implementation now uses a persistent outbox and standalone worker. See [EMAIL_AUTOMATION.md](EMAIL_AUTOMATION.md) for current behavior, verification, limitations, and PythonAnywhere deployment. The findings below describe the historical implementation.
+
 Audit date: October 9, 2026. Scope: the Django project in this workspace, its local configuration/database, isolated automated tests, and four authorized SMTP test messages. Production code, scheduler configuration, and delivery logs were not available for comparison. Findings about the local database do not establish the production database's state.
 
 **Assessment:** SMTP submission works from this environment, but reminder scheduling and failure recovery have confirmed gaps. Passing happy-path tests alone does not establish reliable automated delivery.

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from .models import ScheduledEmail, EmailWorkerHeartbeat
 
 from .models import (
     BlogArticle,
@@ -112,14 +113,14 @@ class MeetingSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
-    list_display = ("get_session_date_label", "get_session_type_label", "created_at")
+    list_display = ("get_session_date_label", "get_session_type_label", "is_cancelled", "created_at")
     list_filter = ("session_type", "session_date", "created_at")
     ordering = ("-created_at",)
     readonly_fields = ("created_at",)
     list_per_page = 25
 
     fieldsets = (
-        ("Reservation details", {"fields": ("session_date", "session_type")}),
+        ("Reservation details", {"fields": ("session_date", "session_type", "is_cancelled")}),
         ("Metadata", {"fields": ("created_at",)}),
     )
 
@@ -132,14 +133,27 @@ class ReservationAdmin(admin.ModelAdmin):
         return obj.get_session_type_display()
 
 
+class EmailStatusInline(admin.TabularInline):
+    model = ScheduledEmail
+    fields = ("kind", "scheduled_at", "status", "sent_at", "attempts", "error")
+    readonly_fields = fields
+    extra = 0
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin):
+    inlines = [EmailStatusInline]
     list_display = (
         "name",
         "email",
         "phone",
         "get_session_type_label",
         "get_session_date_label",
+        "is_cancelled",
         "reminder_sent",
         "reminder_1h_sent",
         "created_at",
@@ -147,12 +161,12 @@ class SubmissionAdmin(admin.ModelAdmin):
     search_fields = ("name", "email", "phone")
     list_filter = ("session_type", "session_date", "created_at")
     ordering = ("-created_at",)
-    readonly_fields = ("created_at",)
+    readonly_fields = ("created_at", "session_date", "session_type", "reminder_sent", "reminder_1h_sent")
     list_per_page = 25
 
     fieldsets = (
         ("Contact details", {"fields": ("name", "email", "phone")}),
-        ("Reservation details", {"fields": ("session_type", "session_date", "message")}),
+        ("Reservation details", {"fields": ("class_date", "reservation", "is_cancelled", "session_type", "session_date", "message")}),
         ("Reminders", {"fields": ("reminder_sent", "reminder_1h_sent")}),
         ("Metadata", {"fields": ("created_at",)}),
     )
@@ -164,3 +178,29 @@ class SubmissionAdmin(admin.ModelAdmin):
     @admin.display(description="Session type", ordering="session_type")
     def get_session_type_label(self, obj):
         return obj.get_session_type_display() if obj.session_type else "Not provided"
+
+
+@admin.register(ScheduledEmail)
+class ScheduledEmailAdmin(admin.ModelAdmin):
+    list_display = ("submission", "kind", "scheduled_at", "status", "sent_at", "attempts", "error")
+    list_filter = ("status", "kind", "scheduled_at")
+    search_fields = ("submission__email", "submission__name", "error", "message_id")
+    readonly_fields = tuple(field.name for field in ScheduledEmail._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(EmailWorkerHeartbeat)
+class EmailWorkerHeartbeatAdmin(admin.ModelAdmin):
+    list_display = ("name", "last_seen_at")
+    readonly_fields = ("name", "last_seen_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

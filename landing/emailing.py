@@ -1,9 +1,10 @@
 import logging
+import smtplib
 from collections.abc import Mapping
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.template import Context, Template, TemplateSyntaxError
+from django.template import Context, Template, TemplateSyntaxError, Engine
 
 from .models import EmailTemplate
 
@@ -80,7 +81,7 @@ Transcendental Meditation Team""",
 }
 
 
-def send_template_email(*, slug: str, to: list[str], context: Mapping[str, object]) -> None:
+def send_template_email(*, slug: str, to: list[str], context: Mapping[str, object], headers=None) -> None:
     """Render an admin-managed email template, using a safe default if it is unavailable."""
     default = DEFAULT_EMAIL_TEMPLATES[slug]
     try:
@@ -94,17 +95,25 @@ def send_template_email(*, slug: str, to: list[str], context: Mapping[str, objec
 
     try:
         template_context = Context(dict(context), autoescape=False)
-        subject = Template(subject_source).render(template_context).strip()
-        body = Template(body_source).render(template_context)
+        engine = Engine(string_if_invalid="__UNKNOWN_EMAIL_VARIABLE__")
+        subject = engine.from_string(subject_source).render(template_context).strip()
+        body = engine.from_string(body_source).render(template_context)
+        if "__UNKNOWN_EMAIL_VARIABLE__" in subject + body:
+            raise TemplateSyntaxError("Unknown variable in email template")
     except TemplateSyntaxError:
         logger.exception("Email template '%s' has invalid Django template syntax; using fallback.", slug)
         template_context = Context(dict(context), autoescape=False)
         subject = Template(default["subject"]).render(template_context).strip()
         body = Template(default["body"]).render(template_context)
 
-    EmailMultiAlternatives(
+    subject = " ".join(subject.splitlines())
+    result = EmailMultiAlternatives(
         subject=subject,
         body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=to,
+        headers=headers,
     ).send(fail_silently=False)
+
+    if result != 1:
+        raise smtplib.SMTPConnectError(421, "Backend accepted zero messages")
